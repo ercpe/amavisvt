@@ -7,11 +7,6 @@ from argparse import ArgumentParser
 
 from amavisvt.daemon import AmavisVT
 
-logging.basicConfig(
-	level=logging.DEBUG,
-	format='%(asctime)s %(levelname)-7s %(message)s',
-)
-
 logger = logging.getLogger(__name__)
 
 
@@ -30,6 +25,11 @@ if __name__ == "__main__":
 	parser = ArgumentParser()
 	parser.add_argument('directory')
 	parser.add_argument('--api-key')
+	parser.add_argument('-v', '--verbose', action='count', help='Increase verbosity', default=2)
 	args = parser.parse_args()
 
+	logging.basicConfig(
+		level=logging.FATAL - (10 * args.verbose),
+		format='%(asctime)s %(levelname)-7s %(message)s',
+	)
 	sys.exit(main(args))

@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
+
+import magic
 import requests
 import logging
 import hashlib
@@ -87,7 +89,11 @@ class AmavisVT(object):
 				continue
 
 			try:
-				files_checksums.append((full_path, self.build_checksum(full_path)))
+				checksum, filetype = self.identify_file(full_path)
+				if filetype.startswith('application/') or not filetype:
+					files_checksums.append((full_path, checksum))
+				else:
+					logger.info("Skipping file %s (wrong filetype %s)", full_path, filetype)
 			except IOError:
 				logger.info("Ignoring %s (IOError)", full_path)
 
@@ -108,16 +114,21 @@ class AmavisVT(object):
 
 		return result
 
-	def build_checksum(self, path):
+	def identify_file(self, path):
 		hasher = hashlib.sha256()
+
+		head = None
 
 		with open(path, 'r') as f:
 			tmp = f.read(self.buffer_size)
 			while tmp:
+				if not head:
+					head = tmp
 				hasher.update(tmp)
 				tmp = f.read(self.buffer_size)
 
-		return hasher.hexdigest()
+		with magic.Magic(flags=magic.MAGIC_MIME_TYPE) as m:
+			return hasher.hexdigest(), m.id_buffer(head or "")
 
 	def check_vt(self, checksums):
 		if not checksums:
@@ -129,6 +140,9 @@ class AmavisVT(object):
 				'resource': ', '.join(checksums)
 			})
 			response.raise_for_status()
+			if response.status_code == 204:
+				logger.info("API-Limit exceeded!")
+				return
 
 			l = response.json()
 			if not isinstance(l, list):
