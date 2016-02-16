@@ -3,7 +3,7 @@
 
 from setuptools import setup, find_packages
 
-VERSION='0.0.1'
+VERSION='0.0.2'
 
 setup(
 	name='amavisvt',
@@ -13,7 +13,7 @@ setup(
 	author_email='johann@j-schmitz.net',
 	url='https://code.not-your-server.de/amavisvt.git/',
 	download_url='https://code.not-your-server.de/amavisvt.git/tags/%s.tar.gz' % VERSION,
-	packages=find_packages(''),
+	packages=['amavisvt'],
 	zip_safe=False,
 	license='GPL-3',
 )
