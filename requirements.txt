@@ -1,1 +1,4 @@
 # Project dependencies
+requests
+filemagic
+python-memcached
