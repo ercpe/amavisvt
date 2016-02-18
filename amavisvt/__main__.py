@@ -5,14 +5,14 @@ import sys
 import logging
 from argparse import ArgumentParser
 
-from amavisvt.daemon import AmavisVT
+from amavisvt.client import AmavisVT
 
 logger = logging.getLogger(__name__)
 
 
 def main(args):
 	detected = False
-	for full_filename, scan_result in AmavisVT(args.api_key).run(args.file_or_directory):
+	for full_filename, scan_result in AmavisVT(args).run(args.file_or_directory):
 		filename = os.path.basename(full_filename)
 		if scan_result:
 			if scan_result.detected:
@@ -29,7 +29,7 @@ def main(args):
 if __name__ == "__main__":
 	parser = ArgumentParser()
 	parser.add_argument('file_or_directory')
-	parser.add_argument('--api-key')
+	parser.add_argument('--apikey')
 	parser.add_argument('-v', '--verbose', action='count', help='Increase verbosity', default=2)
 	args = parser.parse_args()
 

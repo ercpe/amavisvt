@@ -9,58 +9,64 @@ import memcache
 
 logger = logging.getLogger(__name__)
 
+try:
+	from ConfigParser import SafeConfigParser as ConfigParser
+except ImportError:
+	from configparser import ConfigParser
+
+
+class Configuration(ConfigParser):
+	def __init__(self, cliargs=None):
+		defaults = cliargs or {}
+		for k in defaults.keys():
+			if not defaults[k]:
+				del defaults[k]
+
+		defaults.setdefault('positive-expire', str(21 * 86400))
+		defaults.setdefault('negative-expire', str(12 * 3600))
+		defaults.setdefault('unknown-expire', str(12 * 3600))
+
+		ConfigParser.__init__(self, defaults=defaults)
+		files_read = self.read([
+			'/etc/amavisvt.cfg',
+			os.path.expanduser('~/.amavisvt.cfg'),
+			'amavisvt.cfg'
+		])
+		logger.info("Read configuration files: %s", files_read)
+
+	@property
+	def apikey(self):
+		return self.get('DEFAULT', 'apikey')
+
+	@property
+	def positive_expire(self):
+		return int(self.get('DEFAULT', 'positive-expire'))
+
+	@property
+	def negative_expire(self):
+		return int(self.get('DEFAULT', 'negative-expire'))
+
+	@property
+	def unknown_expire(self):
+		return int(self.get('DEFAULT', 'unknown-expire'))
+
 
 class VTResponse(object):
 	def __init__(self, virustotal_response):
 		self._data = virustotal_response
 
-	@property
-	def resource(self):
-		return self._data['resource']
-
-	@property
-	def response_code(self):
-		return self._data['response_code']
-
-	@property
-	def verbose_message(self):
-		return self._data['verbose_msg']
-
-	@property
-	def md5(self):
-		return self._data.get('md5')
-
-	@property
-	def permalink(self):
-		return self._data.get('permalink')
-
-	@property
-	def positives(self):
-		return int(self._data.get('positives', 0))
-
-	@property
-	def scan_date(self):
-		return self._data.get('scan_date')
-
-	@property
-	def scan_id(self):
-		return self._data.get('scan_id')
-
-	@property
-	def scans(self):
-		return self._data.get('scans')
-
-	@property
-	def sha1(self):
-		return self._data.get('sha1')
-
-	@property
-	def sha256(self):
-		return self._data.get('sha256')
-
-	@property
-	def total(self):
-		return self._data.get('total')
+	resource = property(lambda self: self._data['resource'])
+	response_code = property(lambda self: self._data['response_code'])
+	verbose_message = property(lambda self:  self._data['verbose_msg'])
+	md5 = property(lambda self: self._data.get('md5'))
+	permalink = property(lambda self: self._data.get('permalink'))
+	positives = property(lambda self: int(self._data.get('positives', 0)))
+	scan_date = property(lambda self:  self._data.get('scan_date'))
+	scan_id = property(lambda self: self._data.get('scan_id'))
+	scans = property(lambda self: self._data.get('scans'))
+	sha1 = property(lambda self: self._data.get('sha1'))
+	sha256 = property(lambda self: self._data.get('sha256'))
+	total = property(lambda self: self._data.get('total'))
 
 	@property
 	def detected(self):
@@ -73,18 +79,15 @@ class VTResponse(object):
 class AmavisVT(object):
 	buffer_size = 4096
 
-	positive_expire = 21 * 86400
-	negative_expire = 12 * 3600
-	unknown_expire = negative_expire
-
-	def __init__(self, api_key, memcached_servers=None):
-		self.api_key = api_key
+	def __init__(self, args, memcached_servers=None):
+		self.config = Configuration({
+			'apikey': args.apikey
+		})
 		self.memcached = memcache.Client(memcached_servers or ['127.0.0.1:11211'])
 
 	def run(self, path):
 		files_checksums = []
 
-		dir_items = []
 		if os.path.isdir(path):
 			dir_items = [os.path.join(path, x) for x in os.listdir(path)]
 		else:
@@ -144,7 +147,7 @@ class AmavisVT(object):
 
 		try:
 			response = requests.post("https://www.virustotal.com/vtapi/v2/file/report", {
-				'apikey': self.api_key,
+				'apikey': self.config.apikey,
 				'resource': ', '.join([x[1] for x in checksums])
 			})
 			response.raise_for_status()
@@ -156,17 +159,16 @@ class AmavisVT(object):
 			if not isinstance(l, list):
 				l = [l]
 
-			#for d in l:
 			for i, d in enumerate(l):
 				vtr = VTResponse(d)
 
 				if vtr.response_code:
 					logger.info("Saving in cache: %s", vtr.sha256)
-					self.set_in_cache(vtr.resource, d, self.positive_expire if vtr.detected else self.negative_expire)
+					self.set_in_cache(vtr.resource, d, self.config.positive_expire if vtr.detected else self.config.negative_expire)
 					logger.debug("Result for %s: %s" % (checksums[i][0], vtr))
 					yield checksums[i][0], vtr
 				else:
-					self.set_in_cache(vtr.resource, d, self.unknown_expire)
+					self.set_in_cache(vtr.resource, d, self.config.unknown_expire)
 					logger.debug("Skipping result (no scan report): %s", vtr.resource)
 					yield checksums[i][0], None
 		except:
@@ -178,4 +180,5 @@ class AmavisVT(object):
 			return VTResponse(from_cache)
 
 	def set_in_cache(self, sha256hash, d, expire=0):
+		logger.debug("Saving key %s in cache. expires in %s seconds", sha256hash, expire)
 		self.memcached.set(sha256hash, d, time=expire)
