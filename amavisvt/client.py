@@ -50,6 +50,10 @@ class Configuration(ConfigParser):
 	def unknown_expire(self):
 		return int(self.get('DEFAULT', 'unknown-expire'))
 
+	@property
+	def hits_required(self):
+		return int(self.get('DEFAULT', 'hits-required'))
+
 
 class VTResponse(object):
 	def __init__(self, virustotal_response):
@@ -68,10 +72,6 @@ class VTResponse(object):
 	sha256 = property(lambda self: self._data.get('sha256'))
 	total = property(lambda self: self._data.get('total'))
 
-	@property
-	def detected(self):
-		return self.positives >= 5
-
 	def __str__(self):
 		return "%s: %s (Positives: %s of %s)" % (self.resource, self.verbose_message, self.positives, self.total)
 
@@ -79,10 +79,8 @@ class VTResponse(object):
 class AmavisVT(object):
 	buffer_size = 4096
 
-	def __init__(self, args, memcached_servers=None):
-		self.config = Configuration({
-			'apikey': args.apikey
-		})
+	def __init__(self, config, memcached_servers=None):
+		self.config = config
 		self.memcached = memcache.Client(memcached_servers or ['127.0.0.1:11211'])
 
 	def run(self, path):
@@ -149,11 +147,10 @@ class AmavisVT(object):
 			response = requests.post("https://www.virustotal.com/vtapi/v2/file/report", {
 				'apikey': self.config.apikey,
 				'resource': ', '.join([x[1] for x in checksums])
-			})
+			}, timeout=10.0)
 			response.raise_for_status()
 			if response.status_code == 204:
-				logger.info("API-Limit exceeded!")
-				return
+				raise Exception("API-Limit exceeded!")
 
 			l = response.json()
 			if not isinstance(l, list):
@@ -164,15 +161,16 @@ class AmavisVT(object):
 
 				if vtr.response_code:
 					logger.info("Saving in cache: %s", vtr.sha256)
-					self.set_in_cache(vtr.resource, d, self.config.positive_expire if vtr.detected else self.config.negative_expire)
+					expires = self.config.positive_expire if vtr.positives >= self.config.hits_required else self.config.negative_expire
+					self.set_in_cache(vtr.resource, d, expires)
 					logger.debug("Result for %s: %s" % (checksums[i][0], vtr))
 					yield checksums[i][0], vtr
 				else:
 					self.set_in_cache(vtr.resource, d, self.config.unknown_expire)
 					logger.debug("Skipping result (no scan report): %s", vtr.resource)
 					yield checksums[i][0], None
-		except:
-			logger.exception("Got exception")
+		except Exception as ex:
+			logger.exception("Error asking virustotal about files")
 
 	def get_from_cache(self, sha256hash):
 		from_cache = self.memcached.get(sha256hash)
@@ -180,5 +178,5 @@ class AmavisVT(object):
 			return VTResponse(from_cache)
 
 	def set_in_cache(self, sha256hash, d, expire=0):
-		logger.debug("Saving key %s in cache. expires in %s seconds", sha256hash, expire)
+		logger.debug("Saving key %s in cache. Expires in %s seconds", sha256hash, expire)
 		self.memcached.set(sha256hash, d, time=expire)

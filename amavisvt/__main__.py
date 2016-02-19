@@ -4,25 +4,33 @@ import os
 import sys
 import logging
 from argparse import ArgumentParser
+from logging.handlers import SysLogHandler
 
-from amavisvt.client import AmavisVT
+from amavisvt.client import AmavisVT, Configuration
 
 logger = logging.getLogger(__name__)
 
 
 def main(args):
+	config = Configuration({
+		'apikey': args.apikey,
+		'hits-required': "5",
+	})
+
 	detected = False
-	for full_filename, scan_result in AmavisVT(args).run(args.file_or_directory):
+	for full_filename, scan_result in AmavisVT(config).run(args.file_or_directory):
 		filename = os.path.basename(full_filename)
-		if scan_result:
-			if scan_result.detected:
+		if scan_result is None:
+			print("%s: Not scanned by virustotal" % filename)
+		elif isinstance(scan_result, Exception):
+			print("%s: Error (%s)" % (filename, scan_result))
+		else:
+			if scan_result.positives >= config.hits_required:
 				detected = True
 				matches = ["%s: %s" % (k, v['result']) for k, v in scan_result.scans.items() if v['detected']]
 				print("%s: Detected as %s (%s of %s)" % (filename, ', '.join(matches), scan_result.positives, scan_result.total))
 			else:
 				print("%s: Clean" % filename)
-		else:
-			print("%s: Not scanned" % filename)
 
 	return detected
 
@@ -37,4 +45,11 @@ if __name__ == "__main__":
 		level=logging.FATAL - (10 * args.verbose),
 		format='%(asctime)s %(levelname)-7s %(message)s',
 	)
+
+	logger = logging.getLogger()
+	handler = SysLogHandler(address='/dev/log')
+	formatter = logging.Formatter('amavisvt: %(message)s')
+	handler.setFormatter(formatter)
+	logger.addHandler(handler)
+
 	sys.exit(int(main(args)))
