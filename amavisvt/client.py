@@ -25,6 +25,7 @@ class Configuration(ConfigParser):
 		defaults.setdefault('positive-expire', str(21 * 86400))
 		defaults.setdefault('negative-expire', str(12 * 3600))
 		defaults.setdefault('unknown-expire', str(12 * 3600))
+		defaults.setdefault('api-url', "https://www.virustotal.com/vtapi/v2/file/report")
 
 		ConfigParser.__init__(self, defaults=defaults)
 		files_read = self.read([
@@ -53,6 +54,10 @@ class Configuration(ConfigParser):
 	@property
 	def hits_required(self):
 		return int(self.get('DEFAULT', 'hits-required'))
+
+	@property
+	def api_url(self):
+		return self.get('DEFAULT', 'api-url')
 
 
 class VTResponse(object):
@@ -144,7 +149,7 @@ class AmavisVT(object):
 			return
 
 		try:
-			response = requests.post("https://www.virustotal.com/vtapi/v2/file/report", {
+			response = requests.post(self.config.api_url, {
 				'apikey': self.config.apikey,
 				'resource': ', '.join([x[1] for x in checksums])
 			}, timeout=10.0)
