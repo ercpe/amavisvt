@@ -37,7 +37,7 @@ class Configuration(ConfigParser):
 
 	@property
 	def apikey(self):
-		return self.get('DEFAULT', 'apikey')
+		return self.get('DEFAULT', 'api-key')
 
 	@property
 	def positive_expire(self):
