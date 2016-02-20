@@ -59,6 +59,4 @@ if __name__ == "__main__":
 	handler.setFormatter(formatter)
 	logger.addHandler(handler)
 
-	logger.debug("DEBUG")
-
 	sys.exit(int(main(args)))
