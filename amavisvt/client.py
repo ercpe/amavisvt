@@ -1,11 +1,15 @@
 # -*- coding: utf-8 -*-
 import os
+import zipfile
 
 import magic
 import requests
 import logging
 import hashlib
 import memcache
+import tempfile
+
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +30,7 @@ class Configuration(ConfigParser):
 		defaults.setdefault('negative-expire', str(12 * 3600))
 		defaults.setdefault('unknown-expire', str(12 * 3600))
 		defaults.setdefault('api-url', "https://www.virustotal.com/vtapi/v2/file/report")
+		defaults.setdefault('scan-zips', "false")
 
 		ConfigParser.__init__(self, defaults=defaults)
 		files_read = self.read([
@@ -58,6 +63,10 @@ class Configuration(ConfigParser):
 	@property
 	def api_url(self):
 		return self.get('DEFAULT', 'api-url')
+
+	@property
+	def scan_zips(self):
+		return (self.get('DEFAULT', 'scan-zips') or "").lower() == "true"
 
 
 class VTResponse(object):
@@ -96,29 +105,16 @@ class AmavisVT(object):
 		else:
 			dir_items = [path]
 
-		for full_path in dir_items:
-			if not os.path.isfile(full_path):
-				logging.info("Not a file: %s. Skipping", full_path)
-				continue
-
-			try:
-				checksum, filetype = self.identify_file(full_path)
-				if filetype.startswith('application/') or filetype in ('text/x-shellscript', 'text/x-perl', 'text/x-ruby', 'text/x-python') or not filetype:
-					files_checksums.append((full_path, checksum))
-				else:
-					logger.info("Skipping file %s (wrong filetype %s)", full_path, filetype)
-			except IOError:
-				logger.info("Ignoring %s (IOError)", full_path)
-
 		result = []
 		hashes_for_vt = []
+
+		files_checksums = self.get_dir_items(dir_items)
 
 		for file_path, checksum in files_checksums:
 			cached_value = self.get_from_cache(checksum)
 
 			if cached_value:
 				logger.info("Using cached result for file %s (%s)", file_path, checksum)
-				logger.debug("Result for %s: %s" % (file_path, cached_value))
 				result.append((file_path, cached_value))
 			else:
 				hashes_for_vt.append((file_path, checksum))
@@ -127,6 +123,59 @@ class AmavisVT(object):
 		result.extend(list(self.check_vt(hashes_for_vt)))
 
 		return result
+
+	def get_dir_items(self, dir_items):
+		files_checksums = []
+
+		for full_path in dir_items:
+			if not os.path.isfile(full_path):
+				logging.info("Not a file: %s. Skipping", full_path)
+				continue
+
+			try:
+				checksum, filetype = self.identify_file(full_path)
+				if filetype.startswith('application/') or \
+					filetype.startswith('image/') or \
+					filetype in ('text/x-shellscript', 'text/x-perl', 'text/x-ruby', 'text/x-python') or not filetype:
+
+					files_checksums.append((full_path, checksum))
+
+					if filetype == 'application/zip' and self.config.scan_zips:
+						files_checksums.extend(self.unpack_and_hash(full_path))
+				else:
+					logger.info("Skipping file %s (wrong filetype %s)", full_path, filetype)
+			except IOError:
+				logger.info("Ignoring %s (IOError)", full_path)
+
+		return files_checksums
+
+	def unpack_and_hash(self, filename):
+		tempdir = tempfile.mkdtemp()
+
+		files_checksums = []
+
+		try:
+			with zipfile.ZipFile(filename) as zf:
+				for i, zi in enumerate(zf.infolist()):
+					if i > 1000:
+						logger.warning("Stopping examining zip entry at %s", i)
+						break
+
+					t = os.path.join(tempdir, "zipentry-%s" % i)
+					logger.debug("Extracting zipinfo %s to %s", zi, t)
+					with zf.open(zi, 'r') as fi:
+						with open(t, 'w') as fo:
+							fo.write(fi.read(1024))
+
+					if os.path.isfile(t):
+						files_checksums.append(self.identify_file(t))
+					os.remove(t)
+		except:
+			logger.exception("Error unpacking zip file %s", filename)
+		finally:
+			shutil.rmtree(tempdir)
+
+		return files_checksums
 
 	def identify_file(self, path):
 		hasher = hashlib.sha256()
@@ -174,7 +223,7 @@ class AmavisVT(object):
 					self.set_in_cache(vtr.resource, d, self.config.unknown_expire)
 					logger.debug("Skipping result (no scan report): %s", vtr.resource)
 					yield checksums[i][0], None
-		except Exception as ex:
+		except:
 			logger.exception("Error asking virustotal about files")
 
 	def get_from_cache(self, sha256hash):
