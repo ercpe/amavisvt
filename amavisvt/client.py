@@ -168,7 +168,8 @@ class AmavisVT(object):
 							fo.write(fi.read(1024))
 
 					if os.path.isfile(t):
-						files_checksums.append(self.identify_file(t))
+						chksum, content_type = self.identify_file(t)
+						files_checksums.append((os.path.basename(t), chksum))
 					os.remove(t)
 		except:
 			logger.exception("Error unpacking zip file %s", filename)
@@ -212,6 +213,7 @@ class AmavisVT(object):
 
 			for i, d in enumerate(l):
 				vtr = VTResponse(d)
+
 
 				if vtr.response_code:
 					logger.info("Saving in cache: %s", vtr.sha256)
