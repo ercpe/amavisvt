@@ -11,6 +11,8 @@ import tempfile
 
 import shutil
 
+from amavisvt import VERSION
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -202,7 +204,9 @@ class AmavisVT(object):
 			response = requests.post(self.config.api_url, {
 				'apikey': self.config.apikey,
 				'resource': ', '.join([x[1] for x in checksums])
-			}, timeout=10.0)
+			}, timeout=10.0, headers={
+				'User-Agent': 'amavisvt/%s (+https://ercpe.de/projects/amavisvt)' % VERSION
+			})
 			response.raise_for_status()
 			if response.status_code == 204:
 				raise Exception("API-Limit exceeded!")

@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from setuptools import setup, find_packages
-
-VERSION='0.1.1'
+from setuptools import setup
+from amavisvt import VERSION
 
 setup(
 	name='amavisvt',
