@@ -154,42 +154,48 @@ class AmavisVT(object):
 
 			checksum, filetype = self.identify_file(full_path)
 
-			if filetype.startswith('message/'):
-				logger.info("Found mail (%s) in %s", filetype, full_path)
+			if not filetype.startswith('message/'):
+				continue
 
-				try:
-					files_checksums = []
+			logger.info("Found mail (%s) in %s", filetype, full_path)
 
-					with open(full_path, 'r') as f:
-						msg = email.message_from_file(f)
+			try:
+				files_checksums = []
 
-					payload = msg.get_payload()
+				with open(full_path, 'r') as f:
+					msg = email.message_from_file(f)
 
-					for i, part in enumerate(payload):
-						filename = part.get_filename()
-						partname = "part%s" % i
+				payload = msg.get_payload()
 
-						if not filename:
-							continue
+				for i, part in enumerate(payload):
+					if not isinstance(part, email.message.Message):
+						logging.debug("Skipping non-message payload")
+						continue
 
-						logger.debug("Testing filename against re %s", self.config.scan_parts_filename_re.pattern)
-						if self.config.scan_parts_filename_re.search(filename):
-							logger.debug("Considering part: %s (matches re)", partname)
-							hasher = hashlib.sha256()
+					filename = part.get_filename()
+					partname = "part%s" % i
 
-							partpayload = part.get_payload()
-							if len(partpayload) > 27892121:  # roughly 20 MiB as base64
-								logger.warning("Skipping part (larger than 20MiB")
-							else:
-								hasher.update(base64.b64decode(partpayload))
-								files_checksums.append((partname, hasher.hexdigest()))
+					if not filename:
+						continue
+
+					logger.debug("Testing filename against re %s", self.config.scan_parts_filename_re.pattern)
+					if self.config.scan_parts_filename_re.search(filename):
+						logger.debug("Considering part: %s (matches re)", partname)
+						hasher = hashlib.sha256()
+
+						partpayload = part.get_payload()
+						if len(partpayload) > 27892121:  # roughly 20 MiB as base64
+							logger.warning("Skipping part (larger than 20MiB")
 						else:
-							logger.debug("Ignoring part: %s", partname)
+							hasher.update(base64.b64decode(partpayload))
+							files_checksums.append((partname, hasher.hexdigest()))
+					else:
+						logger.debug("Ignoring part: %s", partname)
 
-					return files_checksums
-				except:
-					logger.exception("Failed to parse mail file %s", full_path)
-					return None
+				return files_checksums
+			except:
+				logger.exception("Failed to parse mail file %s", full_path)
+				return None
 
 		return None
 
