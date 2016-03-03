@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
+import base64
+import email
 import os
 import zipfile
 
 import magic
+import re
 import requests
 import logging
 import hashlib
@@ -33,6 +36,8 @@ class Configuration(ConfigParser):
 		defaults.setdefault('unknown-expire', str(12 * 3600))
 		defaults.setdefault('api-url', "https://www.virustotal.com/vtapi/v2/file/report")
 		defaults.setdefault('scan-zips', "false")
+		defaults.setdefault('scan-whole-mail', "false")
+		defaults.setdefault('scan-parts-filename', r'.*')
 
 		ConfigParser.__init__(self, defaults=defaults)
 		files_read = self.read([
@@ -70,6 +75,14 @@ class Configuration(ConfigParser):
 	def scan_zips(self):
 		return (self.get('DEFAULT', 'scan-zips') or "").lower() == "true"
 
+	@property
+	def scan_whole_mail(self):
+		return (self.get('DEFAULT', 'scan-whole-mail') or "").lower() == "true"
+
+	@property
+	def scan_parts_filename_re(self):
+		return re.compile(self.get('DEFAULT', 'scan-parts-filename') or "", flags=re.IGNORECASE)
+
 
 class VTResponse(object):
 	def __init__(self, virustotal_response):
@@ -100,8 +113,6 @@ class AmavisVT(object):
 		self.memcached = memcache.Client(memcached_servers or ['127.0.0.1:11211'])
 
 	def run(self, path):
-		files_checksums = []
-
 		if os.path.isdir(path):
 			dir_items = [os.path.join(path, x) for x in os.listdir(path)]
 		else:
@@ -110,7 +121,16 @@ class AmavisVT(object):
 		result = []
 		hashes_for_vt = []
 
-		files_checksums = self.get_dir_items(dir_items)
+		files_checksums = None
+
+		if self.config.scan_whole_mail:
+			logger.debug("Scanning whole mail")
+			files_checksums = self.checksums_from_mail(dir_items)
+			if files_checksums is None:
+				logger.warning("Mail not found in %s. Scanning all files!", dir_items)
+
+		if not files_checksums:
+			files_checksums = self.checksums_from_dir(dir_items)
 
 		for file_path, checksum in files_checksums:
 			cached_value = self.get_from_cache(checksum)
@@ -126,7 +146,54 @@ class AmavisVT(object):
 
 		return result
 
-	def get_dir_items(self, dir_items):
+	def checksums_from_mail(self, dir_items):
+		for full_path in dir_items:
+			if not os.path.isfile(full_path):
+				logging.info("Not a file: %s. Skipping", full_path)
+				continue
+
+			checksum, filetype = self.identify_file(full_path)
+
+			if filetype.startswith('message/'):
+				logger.info("Found mail (%s) in %s", filetype, full_path)
+
+				try:
+					files_checksums = []
+
+					with open(full_path, 'r') as f:
+						msg = email.message_from_file(f)
+
+					payload = msg.get_payload()
+
+					for i, part in enumerate(payload):
+						filename = part.get_filename()
+						partname = "part%s" % i
+
+						if not filename:
+							continue
+
+						logger.debug("Testing filename against re %s", self.config.scan_parts_filename_re.pattern)
+						if self.config.scan_parts_filename_re.search(filename):
+							logger.debug("Considering part: %s (matches re)", partname)
+							hasher = hashlib.sha256()
+
+							partpayload = part.get_payload()
+							if len(partpayload) > 27892121:  # roughly 20 MiB as base64
+								logger.warning("Skipping part (larger than 20MiB")
+							else:
+								hasher.update(base64.b64decode(partpayload))
+								files_checksums.append((partname, hasher.hexdigest()))
+						else:
+							logger.debug("Ignoring part: %s", partname)
+
+					return files_checksums
+				except:
+					logger.exception("Failed to parse mail file %s", full_path)
+					return None
+
+		return None
+
+	def checksums_from_dir(self, dir_items):
 		files_checksums = []
 
 		for full_path in dir_items:
