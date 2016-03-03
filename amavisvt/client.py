@@ -190,7 +190,7 @@ class AmavisVT(object):
 
 				return files_checksums
 			except:
-				logger.exception("Failed to parse mail file %s", full_path)
+				logger.exception("Failed to parse mail file %s", email_file)
 				return None
 
 		return None
