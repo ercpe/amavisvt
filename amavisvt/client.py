@@ -125,7 +125,7 @@ class AmavisVT(object):
 
 		if self.config.scan_whole_mail:
 			logger.debug("Scanning whole mail")
-			files_checksums = self.checksums_from_mail(dir_items)
+			files_checksums = self.checksums_from_mail(path)
 			if files_checksums is None:
 				logger.warning("Mail not found in %s. Scanning all files!", dir_items)
 
@@ -146,23 +146,19 @@ class AmavisVT(object):
 
 		return result
 
-	def checksums_from_mail(self, dir_items):
-		for full_path in dir_items:
-			if not os.path.isfile(full_path):
-				logging.info("Not a file: %s. Skipping", full_path)
+	def checksums_from_mail(self, path):
+		for p in path, os.path.dirname(path):
+			email_file = os.path.join(p, 'email.txt')
+			if not os.path.exists(email_file):
+				logging.info("Not a file: %s. Skipping", email_file)
 				continue
 
-			checksum, filetype = self.identify_file(full_path)
-
-			if not filetype.startswith('message/'):
-				continue
-
-			logger.info("Found mail (%s) in %s", filetype, full_path)
+			logger.info("Found mail in %s", email_file)
 
 			try:
 				files_checksums = []
 
-				with open(full_path, 'r') as f:
+				with open(email_file, 'r') as f:
 					msg = email.message_from_file(f)
 
 				payload = msg.get_payload()

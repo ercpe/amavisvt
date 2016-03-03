@@ -61,4 +61,8 @@ if __name__ == "__main__":
 	handler.setFormatter(formatter)
 	logger.addHandler(handler)
 
-	sys.exit(int(main(args)))
+	try:
+		sys.exit(int(main(args)))
+	except:
+		logger.exception("Failed")
+		sys.exit(2)
