@@ -162,6 +162,9 @@ class AmavisVT(object):
 					msg = email.message_from_file(f)
 
 				payload = msg.get_payload()
+				if not isinstance(payload, list):
+					logger.debug("Skipping single payload message")
+					return None
 
 				for i, part in enumerate(payload):
 					if not isinstance(part, email.message.Message):
