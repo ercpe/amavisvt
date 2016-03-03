@@ -62,7 +62,9 @@ if __name__ == "__main__":
 	logger.addHandler(handler)
 
 	try:
-		sys.exit(int(main(args)))
+		exit_code = int(main(args))
 	except:
 		logger.exception("Failed")
-		sys.exit(2)
+		exit_code = 2
+
+	sys.exit(exit_code)
