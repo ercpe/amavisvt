@@ -112,161 +112,161 @@ class AmavisVT(object):
 		self.config = config
 		self.memcached = memcache.Client(memcached_servers or ['127.0.0.1:11211'])
 
-	def run(self, path):
-		if os.path.isdir(path):
-			dir_items = [os.path.join(path, x) for x in os.listdir(path)]
-		else:
-			dir_items = [path]
+		self.clean_paths = []
 
+	def run(self, paths, recursively=True):
 		result = []
 		hashes_for_vt = []
 
-		files_checksums = None
-
-		if self.config.scan_whole_mail:
-			logger.debug("Scanning whole mail")
-			files_checksums = self.checksums_from_mail(path)
-			if files_checksums is None:
-				logger.warning("Mail not found in %s. Scanning all files!", dir_items)
-
-		if not files_checksums:
-			files_checksums = self.checksums_from_dir(dir_items)
-
-		for file_path, checksum in files_checksums:
-			cached_value = self.get_from_cache(checksum)
-
-			if cached_value:
-				logger.info("Using cached result for file %s (%s)", file_path, checksum)
-				result.append((file_path, cached_value))
-			else:
-				hashes_for_vt.append((file_path, checksum))
-
-		logger.info("Sending %s hashes to Virustotal", len(hashes_for_vt))
-		result.extend(list(self.check_vt(hashes_for_vt)))
-
-		return result
-
-	def checksums_from_mail(self, path):
-		for p in path, os.path.dirname(path):
-			email_file = os.path.join(p, 'email.txt')
-			if not os.path.exists(email_file):
-				logging.info("Not a file: %s. Skipping", email_file)
-				continue
-
-			logger.info("Found mail in %s", email_file)
-
-			try:
-				files_checksums = []
-
-				with open(email_file, 'r') as f:
-					msg = email.message_from_file(f)
-
-				payload = msg.get_payload()
-				if not isinstance(payload, list):
-					logger.debug("Skipping single payload message")
-					return None
-
-				for i, part in enumerate(payload):
-					if not isinstance(part, email.message.Message):
-						logging.debug("Skipping non-message payload")
-						continue
-
-					filename = part.get_filename()
-					partname = "part%s" % i
-
-					if not filename:
-						continue
-
-					logger.debug("Testing filename against re %s", self.config.scan_parts_filename_re.pattern)
-					if self.config.scan_parts_filename_re.search(filename):
-						logger.debug("Considering part: %s (matches re)", partname)
-						hasher = hashlib.sha256()
-
-						partpayload = part.get_payload()
-						if len(partpayload) > 27892121:  # roughly 20 MiB as base64
-							logger.warning("Skipping part (larger than 20MiB")
-						else:
-							hasher.update(base64.b64decode(partpayload))
-							files_checksums.append((partname, hasher.hexdigest()))
-					else:
-						logger.debug("Ignoring part: %s", partname)
-
-				return files_checksums
-			except:
-				logger.exception("Failed to parse mail file %s", email_file)
-				return None
-
-		return None
-
-	def checksums_from_dir(self, dir_items):
-		files_checksums = []
-
-		for full_path in dir_items:
-			if not os.path.isfile(full_path):
-				logging.info("Not a file: %s. Skipping", full_path)
-				continue
-
-			try:
-				checksum, filetype = self.identify_file(full_path)
-				if filetype.startswith('application/') or \
-					filetype.startswith('image/') or \
-					filetype in ('text/x-shellscript', 'text/x-perl', 'text/x-ruby', 'text/x-python') or not filetype:
-
-					files_checksums.append((full_path, checksum))
-
-					if filetype == 'application/zip' and self.config.scan_zips:
-						files_checksums.extend(self.unpack_and_hash(full_path))
-				else:
-					logger.info("Skipping file %s (wrong filetype %s)", full_path, filetype)
-			except IOError:
-				logger.info("Ignoring %s (IOError)", full_path)
-
-		return files_checksums
-
-	def unpack_and_hash(self, filename):
-		tempdir = tempfile.mkdtemp()
-
-		files_checksums = []
-
 		try:
-			with zipfile.ZipFile(filename) as zf:
-				for i, zi in enumerate(zf.infolist()):
-					if i > 1000:
-						logger.warning("Stopping examining zip entry at %s", i)
+			for path, friendly_name, checksum in self.get_checksums(self.find_files(paths, recursively)):
+				logger.debug("%s = %s (SHA256)", friendly_name, checksum)
+
+				cached_value = self.get_from_cache(checksum)
+
+				if cached_value:
+					logger.info("Using cached result for file %s (%s)", path, checksum)
+					result.append((path, cached_value))
+				else:
+					hashes_for_vt.append((path, checksum))
+
+			logger.info("Sending %s hashes to Virustotal", len(hashes_for_vt))
+			result.extend(list(self.check_vt(hashes_for_vt)))
+
+			return result
+
+		finally:
+			for p in self.clean_paths:
+				try:
+					logger.debug("Cleaning up: %s", p)
+					shutil.rmtree(p)
+				except:
+					logger.exception("Could not remove %s", p)
+
+	def find_files(self, paths, recursively, auto_unpack=True):
+		for path in paths:
+			path = os.path.abspath(os.path.expanduser(path))
+
+			def _iter_file(filename):
+				if os.path.getsize(filename) == 0:
+					return
+
+				tmp_dir = None
+				if auto_unpack:
+					tmp_dir = self.extract_file(filename)
+
+				if tmp_dir:
+					for x in self.find_files([tmp_dir], True, False):
+						yield x
+				else:
+					yield filename, filename[len(path)+1:]
+
+			if os.path.isfile(path):
+				for x in _iter_file(path):
+					yield x
+			elif os.path.isdir(path):
+				for root, dirs, files in os.walk(path):
+					for f in files:
+						for x in _iter_file(os.path.join(root, f)):
+							yield x
+
+					if not recursively:
 						break
 
-					t = os.path.join(tempdir, "zipentry-%s" % i)
-					logger.debug("Extracting zipinfo %s to %s", zi, t)
-					with zf.open(zi, 'r') as fi:
-						with open(t, 'w') as fo:
-							fo.write(fi.read(1024))
+	def get_checksums(self, paths):
+		for path, friendly_name in paths:
+			try:
+				# todo: identify file
+				hasher = hashlib.sha256()
 
-					if os.path.isfile(t):
-						chksum, content_type = self.identify_file(t)
-						files_checksums.append((os.path.basename(t), chksum))
-					os.remove(t)
-		except:
-			logger.exception("Error unpacking zip file %s", filename)
-		finally:
-			shutil.rmtree(tempdir)
+				with open(path, 'r') as f:
+					tmp = f.read(self.buffer_size)
+					while tmp:
+						hasher.update(tmp)
+						tmp = f.read(self.buffer_size)
 
-		return files_checksums
+				yield path, friendly_name, hasher.hexdigest()
+			except IOError as ioe:
+				logger.warning("Skipping %s: %s", path, ioe)
 
-	def identify_file(self, path):
-		hasher = hashlib.sha256()
+	def extract_file(self, path):
+		basename, ext = os.path.splitext(path.lower())
 
-		head = None
+		if ext == '.zip':
+			tempdir = tempfile.mkdtemp()
+			self.clean_paths.append(tempdir)
 
-		with open(path, 'r') as f:
-			tmp = f.read(self.buffer_size)
-			while tmp:
-				if not head:
-					head = tmp
-				hasher.update(tmp)
-				tmp = f.read(self.buffer_size)
+			try:
+				shutil.copy(path, os.path.join(tempdir, os.path.basename(path)))
+				with zipfile.ZipFile(path) as zf:
+					for i, zi in enumerate(zf.infolist()):
+						if i > 1000:
+							logger.warning("Stopping examining zip entry at %s", i)
+							break
 
-		with magic.Magic(flags=magic.MAGIC_MIME_TYPE) as m:
-			return hasher.hexdigest(), m.id_buffer(head or "")
+						t = os.path.join(tempdir, "zipentry-%s" % i)
+						logger.debug("Extracting zipinfo %s to %s", zi, t)
+						with zf.open(zi, 'r') as fi:
+							with open(t, 'w') as fo:
+								tmp = fi.read(self.buffer_size)
+								while tmp:
+									fo.write(tmp)
+									tmp = fi.read(self.buffer_size)
+				return tempdir
+			except zipfile.error as e:
+				logger.error("Error unpacking zip file %s: %s", path, e)
+		else:
+			with magic.Magic(flags=magic.MAGIC_MIME_TYPE) as m:
+				with open(path) as f:
+					is_mail = m.id_buffer(f.read(min(5 * 1024 * 1024, os.path.getsize(path)))) == "message/rfc822"
+
+			if is_mail:
+				logger.debug("Identified mail file: %s", path)
+
+				tempdir = tempfile.mkdtemp()
+				self.clean_paths.append(tempdir)
+
+				try:
+					shutil.copy(path, os.path.join(tempdir, os.path.basename(path)))
+
+					msg = email.message_from_file(open(path))
+
+					payload = msg.get_payload()
+
+					if not isinstance(payload, list):
+						logger.debug("Skipping single payload message")
+						return None
+
+					for i, part in enumerate(payload):
+						if not isinstance(part, email.message.Message):
+							logging.debug("Skipping non-message payload")
+							continue
+
+						filename = part.get_filename()
+						partname = "part%s" % i
+
+						if not filename:
+							continue
+
+						logger.debug("Testing filename against re %s", self.config.scan_parts_filename_re.pattern)
+						if self.config.scan_parts_filename_re.search(filename):
+							logger.debug("Considering part: %s (matches re)", partname)
+
+							partpayload = part.get_payload()
+							if len(partpayload) > 27892121:  # roughly 20 MiB as base64
+								logger.warning("Skipping part (larger than 20MiB")
+							else:
+								outpath = os.path.join(tempdir, partname)
+								with open(outpath, 'w') as o:
+									o.write(base64.b64decode(partpayload))
+						else:
+							logger.debug("Ignoring part: %s", partname)
+
+					return tempdir
+				except:
+					logger.exception("Failed to parse mail file %s", path)
+
+		return None
 
 	def check_vt(self, checksums):
 		if not checksums:
@@ -283,24 +283,34 @@ class AmavisVT(object):
 			if response.status_code == 204:
 				raise Exception("API-Limit exceeded!")
 
-			l = response.json()
-			if not isinstance(l, list):
-				l = [l]
+			responses = response.json()
+			if not isinstance(responses, list):
+				responses = [responses]
 
-			for i, d in enumerate(l):
-				vtr = VTResponse(d)
+			for filename, checksum in checksums:
+				try:
+					d = [d for d in responses
+							if checksum in (
+								d.get('resource', None),
+								d.get('md5', None),
+								d.get('sha1', None),
+								d.get('sha256', None),
+							)][0]
+					vtr = VTResponse(d)
 
+					if vtr.response_code:
+						logger.info("Saving in cache: %s", vtr.sha256)
+						expires = self.config.positive_expire if vtr.positives >= self.config.hits_required else self.config.negative_expire
+						self.set_in_cache(vtr.resource, d, expires)
+						logger.debug("Result for %s: %s" % (filename, vtr))
+						yield filename, vtr
+					else:
+						self.set_in_cache(vtr.resource, d, self.config.unknown_expire)
+						logger.debug("Skipping result (no scan report): %s", vtr.resource)
+						yield filename, None
 
-				if vtr.response_code:
-					logger.info("Saving in cache: %s", vtr.sha256)
-					expires = self.config.positive_expire if vtr.positives >= self.config.hits_required else self.config.negative_expire
-					self.set_in_cache(vtr.resource, d, expires)
-					logger.debug("Result for %s: %s" % (checksums[i][0], vtr))
-					yield checksums[i][0], vtr
-				else:
-					self.set_in_cache(vtr.resource, d, self.config.unknown_expire)
-					logger.debug("Skipping result (no scan report): %s", vtr.resource)
-					yield checksums[i][0], None
+				except IndexError:
+					logger.warn("Got no response for %s (%s)", filename, checksum)
 		except:
 			logger.exception("Error asking virustotal about files")
 

@@ -19,7 +19,9 @@ def main(args):
 	})
 
 	detected = False
-	for full_filename, scan_result in AmavisVT(config).run(args.file_or_directory):
+	paths = args.files_or_directories if isinstance(args.files_or_directories, list) else [args.files_or_directories]
+
+	for full_filename, scan_result in AmavisVT(config).run(paths, args.recursive):
 		filename = os.path.basename(full_filename)
 		if scan_result is None:
 			print("%s: Not scanned by virustotal" % filename)
@@ -37,8 +39,9 @@ def main(args):
 
 if __name__ == "__main__":
 	parser = ArgumentParser()
-	parser.add_argument('file_or_directory')
+	parser.add_argument('files_or_directories')
 	parser.add_argument('--apikey')
+	parser.add_argument('-r', '--recursive', action='store_true', help="Scan directory recursively", default=True)
 	parser.add_argument('-v', '--verbose', action='count', help='Increase verbosity', default=2)
 	parser.add_argument('-d', '--debug', action='store_true', default=False, help='Send verbose log messages to stdout too')
 	parser.add_argument('-z', '--scan-zips', action='store_true', default=False)
