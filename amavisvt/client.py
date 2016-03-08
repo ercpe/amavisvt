@@ -239,6 +239,8 @@ class Resource(object):
 						with open(outpath, 'w') as o:
 							o.write(base64.b64decode(partpayload))
 
+						logger.debug("Mail part %s: orig filename: %s, mime type: %s", outpath, filename, Resource(outpath).mime_type)
+
 				return tempdir, None
 			except:
 				logger.exception("Failed to parse mail file %s", self.path)
@@ -282,12 +284,16 @@ class AmavisVT(object):
 			results.extend(list(self.check_vt(hashes_for_vt)))
 
 			# todo: implement me
-			# if self.config.gather_samples:
-			# 	for resource, result in results:
-			# 		if not isinstance(result, VTResponse):
-			# 			continue
-			#
-			# 		if result and result.total is None:
+			if self.config.gather_samples:
+				try:
+					for resource, result in results:
+						if not isinstance(result, VTResponse):
+							continue
+
+						logger.debug("Sample gathering: result.total: %s, result.positives: %s", result.total, result.positives)
+						#if result and result.total is None:
+				except:
+					logger.exception("Sample gathering failed")
 
 			return results
 
