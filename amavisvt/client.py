@@ -111,6 +111,7 @@ class Resource(object):
 		self._sha256 = None
 		self._mime_type = None
 		self._size = None
+		self._mail_indicator = None
 
 	@property
 	def md5(self):
@@ -137,6 +138,12 @@ class Resource(object):
 		return self._mime_type
 
 	@property
+	def mail_hint(self):
+		if self._mail_indicator is None:
+			self.examine()
+		return self._mail_indicator
+
+	@property
 	def size(self):
 		if self._size is None:
 			self._size = os.path.getsize(self.path)
@@ -144,7 +151,7 @@ class Resource(object):
 
 	@property
 	def can_unpack(self):
-		return self.mime_type in ('application/zip', 'message/rfc822', )
+		return self.mime_type in ('application/zip', 'message/rfc822', ) or self.mail_hint
 
 	@property
 	def basename(self):
@@ -176,6 +183,18 @@ class Resource(object):
 		with magic.Magic(flags=magic.MAGIC_MIME_TYPE) as m:
 			self._mime_type = m.id_buffer(id_buffer)
 
+			if self._mime_type != 'message/rfc822':
+				if '\n\n' in id_buffer:
+					try:
+						msg = email.message_from_string(id_buffer)
+						self._mail_indicator = len(msg.keys()) and 'From' in msg and 'To' in msg
+						if self._mail_indicator:
+							logger.debug("Identified mail in %s when libmagic could not (said it was %s)", self.basename, self.mime_type)
+					except:
+						self._mail_indicator = False
+				else:
+					self._mail_indicator = False
+
 	def unpack(self):
 		if self.mime_type == 'application/zip':
 			logger.debug("Unpacking %s as ZIP", self.path)
@@ -201,7 +220,7 @@ class Resource(object):
 			except zipfile.error as e:
 				logger.error("Error unpacking zip file %s: %s", self.path, e)
 
-		elif self.mime_type == 'message/rfc822':
+		elif self.mime_type == 'message/rfc822' or self.mail_hint:
 			tempdir = tempfile.mkdtemp()
 
 			try:
@@ -335,17 +354,19 @@ class AmavisVT(object):
 				continue
 
 			if resource.can_unpack and auto_unpack:
-				tempdir, res = resource.unpack()
+				try:
+					tempdir, res = resource.unpack()
 
-				if tempdir is not None:
-					self.clean_paths.append(tempdir)
+					if tempdir is not None:
+						self.clean_paths.append(tempdir)
 
-					for subresource in self.find_files(tempdir, False):
-						yield subresource
+						for subresource in self.find_files(tempdir, False):
+							yield subresource
 
-				if res:
-					yield res
-
+					if res:
+						yield res
+				except:
+					logger.exception("Unpacking %s failed", resource)
 			else:
 				yield resource
 
