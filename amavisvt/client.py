@@ -273,7 +273,7 @@ class AmavisVT(object):
 				cached_value = self.get_from_cache(resource.sha256)
 
 				if cached_value:
-					logger.info("Using cached result for file %s (%s)", resource, resource.sha256)
+					logger.info("Using cached result for file %s (%s): %s", resource, resource.sha256, cached_value)
 					results.append((resource, cached_value))
 				else:
 					hashes_for_vt.append((resource, resource.sha256))
