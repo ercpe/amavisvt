@@ -21,19 +21,18 @@ def main(args):
 	detected = False
 	paths = args.files_or_directories if isinstance(args.files_or_directories, list) else [args.files_or_directories]
 
-	for full_filename, scan_result in AmavisVT(config).run(paths, args.recursive):
-		filename = os.path.basename(full_filename)
+	for resource, scan_result in AmavisVT(config).run(paths, args.recursive):
 		if scan_result is None:
-			print("%s: Not scanned by virustotal" % filename)
+			print("%s: Not scanned by virustotal" % resource)
 		elif isinstance(scan_result, Exception):
-			print("%s: Error (%s)" % (filename, scan_result))
+			print("%s: Error (%s)" % (resource, scan_result))
 		else:
 			if scan_result.positives >= config.hits_required:
 				detected = True
-				matches = ["%s: %s" % (k, v['result']) for k, v in scan_result.scans.items() if v['detected']]
-				print("%s: Detected as %s (%s of %s)" % (filename, ', '.join(matches), scan_result.positives, scan_result.total))
+				matches = [v['result'] for _, v in scan_result.scans.items() if v['detected']]
+				print("%s: Detected as %s (%s of %s)" % (resource, ', '.join(matches), scan_result.positives, scan_result.total))
 			else:
-				print("%s: Clean" % filename)
+				print("%s: Clean" % resource)
 
 	return detected
 
