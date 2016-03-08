@@ -37,9 +37,8 @@ class Configuration(ConfigParser):
 		defaults.setdefault('negative-expire', str(12 * 3600))
 		defaults.setdefault('unknown-expire', str(12 * 3600))
 		defaults.setdefault('api-url', "https://www.virustotal.com/vtapi/v2/file/report")
-		defaults.setdefault('scan-zips', "false")
-		defaults.setdefault('scan-whole-mail', "false")
-		defaults.setdefault('scan-parts-filename', r'.*')
+		defaults.setdefault('gather-samples', 'false')
+		defaults.setdefault('sample-dir', 'None')
 
 		ConfigParser.__init__(self, defaults=defaults)
 		files_read = self.read([
@@ -72,6 +71,14 @@ class Configuration(ConfigParser):
 	@property
 	def api_url(self):
 		return self.get('DEFAULT', 'api-url')
+
+	@property
+	def gather_samples(self):
+		return (self.get('DEFAULT', 'gather-samples') or "").lower() == "true"
+
+	@property
+	def samples_dir(self):
+		return self.get('DEFAULT', 'samples-dir')
 
 
 class VTResponse(object):
@@ -201,11 +208,15 @@ class Resource(object):
 				with open(self.path) as f:
 					msg = email.message_from_file(f)
 
+				sender = msg.get('From', '<not set>')
+				recipient = msg.get('To', '<not set>')
+				logger.info("Mail from %s to %s", sender, recipient)
+
 				payload = msg.get_payload()
 
 				if not isinstance(payload, list):
 					logger.debug("Skipping single payload message")
-					return None
+					return None, None
 
 				for i, part in enumerate(payload):
 					if not isinstance(part, email.message.Message):
@@ -248,7 +259,7 @@ class AmavisVT(object):
 		self.clean_paths = []
 
 	def run(self, paths, recursively=True):
-		result = []
+		results = []
 		hashes_for_vt = []
 
 		try:
@@ -263,14 +274,22 @@ class AmavisVT(object):
 
 				if cached_value:
 					logger.info("Using cached result for file %s (%s)", resource, resource.sha256)
-					result.append((resource, cached_value))
+					results.append((resource, cached_value))
 				else:
 					hashes_for_vt.append((resource, resource.sha256))
 
 			logger.info("Sending %s hashes to Virustotal", len(hashes_for_vt))
-			result.extend(list(self.check_vt(hashes_for_vt)))
+			results.extend(list(self.check_vt(hashes_for_vt)))
 
-			return result
+			# todo: implement me
+			# if self.config.gather_samples:
+			# 	for resource, result in results:
+			# 		if not isinstance(result, VTResponse):
+			# 			continue
+			#
+			# 		if result and result.total is None:
+
+			return results
 
 		finally:
 			for p in self.clean_paths:
