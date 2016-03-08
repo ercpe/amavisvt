@@ -2,6 +2,7 @@
 import base64
 import email
 import os
+import uuid
 import zipfile
 
 import magic
@@ -38,7 +39,7 @@ class Configuration(ConfigParser):
 		defaults.setdefault('unknown-expire', str(12 * 3600))
 		defaults.setdefault('api-url', "https://www.virustotal.com/vtapi/v2/file/report")
 		defaults.setdefault('gather-samples', 'false')
-		defaults.setdefault('sample-dir', 'None')
+		defaults.setdefault('samples-dir', 'None')
 
 		ConfigParser.__init__(self, defaults=defaults)
 		files_read = self.read([
@@ -250,15 +251,18 @@ class Resource(object):
 
 					basename, ext = os.path.splitext(filename)
 
-					partpayload = part.get_payload()
-					if len(partpayload) > 27892121:  # roughly 20 MiB as base64
-						logger.warning("Skipping part (larger than 20MiB")
-					else:
-						outpath = os.path.join(tempdir, "%s%s" % (partname, ext))
-						with open(outpath, 'w') as o:
-							o.write(base64.b64decode(partpayload))
+					try:
+						partpayload = part.get_payload()
+						if len(partpayload) > 27892121:  # roughly 20 MiB as base64
+							logger.warning("Skipping part (larger than 20MiB")
+						else:
+							outpath = os.path.join(tempdir, "%s%s" % (partname, ext))
+							with open(outpath, 'w') as o:
+								o.write(base64.b64decode(partpayload))
 
-						logger.debug("Mail part %s: orig filename: %s, mime type: %s", outpath, filename, Resource(outpath).mime_type)
+							logger.debug("Mail part %s: orig filename: %s, mime type: %s", outpath, filename, Resource(outpath).mime_type)
+					except Exception as ex:
+						logger.error("Could not extract attchment %s: %s", partname, ex)
 
 				return tempdir, None
 			except:
@@ -302,15 +306,20 @@ class AmavisVT(object):
 			logger.info("Sending %s hashes to Virustotal", len(hashes_for_vt))
 			results.extend(list(self.check_vt(hashes_for_vt)))
 
-			# todo: implement me
 			if self.config.gather_samples:
+				temp_dir = os.path.join(self.config.samples_dir, str(uuid.uuid4()))
+
 				try:
 					for resource, result in results:
-						if not isinstance(result, VTResponse):
-							continue
+						if result is None or result.total is None and self.is_included(resource):
+							if result:
+								logger.debug("Sample gathering: result.total: %s, result.positives: %s", result.total, result.positives)
+							if not os.path.exists(temp_dir):
+								os.makedirs(temp_dir, 0o700)
 
-						logger.debug("Sample gathering: result.total: %s, result.positives: %s", result.total, result.positives)
-						#if result and result.total is None:
+							dest = os.path.join(temp_dir, os.path.basename(resource.path))
+							logger.info("Saving sample of %s as %s", resource, dest)
+							shutil.copy(resource.path, dest)
 				except:
 					logger.exception("Sample gathering failed")
 
@@ -328,7 +337,7 @@ class AmavisVT(object):
 		return any((f(resource) for f in [
 					lambda r: r.mime_type.startswith('application/'),
 					lambda r: r.mime_type in ('text/x-shellscript', 'text/x-perl', 'text/x-ruby', 'text/x-python'),
-					lambda r: re.search(r"\.(exe|zip|tar\.[\w\d]+|doc\w?|xls\w?|ppt\w?|pdf|js|bat|cmd|rtf|ttf|html?)$", r.basename, re.IGNORECASE)
+					lambda r: re.search(r"\.(exe|com|zip|tar\.[\w\d]+|doc\w?|xls\w?|ppt\w?|pdf|js|bat|cmd|rtf|ttf|html?)$", r.basename, re.IGNORECASE)
 		]))
 
 	def find_files(self, paths, recursively, auto_unpack=True):
