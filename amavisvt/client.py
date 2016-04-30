@@ -26,6 +26,14 @@ except ImportError:
 
 BUFFER_SIZE = 4096
 
+def clean_silent(paths):
+	for p in paths if isinstance(paths, list) else [paths]:
+		try:
+			logger.debug("Cleaning up: %s", p)
+			shutil.rmtree(p)
+		except:
+			logger.exception("Could not remove %s", p)
+
 
 class Configuration(ConfigParser):
 	def __init__(self, cliargs=None):
@@ -220,6 +228,7 @@ class Resource(object):
 				return tempdir, self
 			except zipfile.error as e:
 				logger.error("Error unpacking zip file %s: %s", self.path, e)
+				clean_silent(tempdir)
 
 		elif self.mime_type == 'message/rfc822' or self.mail_hint:
 			tempdir = tempfile.mkdtemp()
@@ -267,6 +276,7 @@ class Resource(object):
 				return tempdir, None
 			except:
 				logger.exception("Failed to parse mail file %s", self.path)
+				clean_silent(tempdir)
 
 		return None, None
 
@@ -326,12 +336,7 @@ class AmavisVT(object):
 			return results
 
 		finally:
-			for p in self.clean_paths:
-				try:
-					logger.debug("Cleaning up: %s", p)
-					shutil.rmtree(p)
-				except:
-					logger.exception("Could not remove %s", p)
+			clean_silent(self.clean_paths)
 
 	def is_included(self, resource):
 		return any((f(resource) for f in [
