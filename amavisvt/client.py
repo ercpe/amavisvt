@@ -89,6 +89,10 @@ class Configuration(ConfigParser):
 	def samples_dir(self):
 		return self.get('DEFAULT', 'samples-dir')
 
+	@property
+	def timeout(self):
+		return self.get('DEFAULT', 'timeout')
+
 
 class VTResponse(object):
 	def __init__(self, virustotal_response):
@@ -392,7 +396,7 @@ class AmavisVT(object):
 			response = requests.post(self.config.api_url, {
 				'apikey': self.config.apikey,
 				'resource': ', '.join([x[1] for x in checksums])
-			}, timeout=10.0, headers={
+			}, timeout=float(self.config.timeout), headers={
 				'User-Agent': 'amavisvt/%s (+https://ercpe.de/projects/amavisvt)' % VERSION
 			})
 			response.raise_for_status()
