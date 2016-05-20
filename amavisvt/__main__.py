@@ -30,8 +30,8 @@ def main(args):
 		else:
 			if scan_result.positives >= config.hits_required:
 				detected = True
-				matches = [v['result'] for _, v in scan_result.scans.items() if v['detected']]
-				print("%s: Detected as %s (%s of %s)" % (resource, ', '.join(matches), scan_result.positives, scan_result.total))
+				matches = [v['result'] for _, v in scan_result.scans.items() if v['detected']][:5]
+				print("%s: Detected as %s (%s of %s)" % (resource, ', '.join(set(matches)), scan_result.positives, scan_result.total))
 			else:
 				print("%s: Clean" % resource)
 
