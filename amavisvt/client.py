@@ -26,6 +26,8 @@ except ImportError:
 
 BUFFER_SIZE = 4096
 
+TEMPDIR_SUFFIX='-amavisvt'
+
 def clean_silent(paths):
 	for p in paths if isinstance(paths, list) else [paths]:
 		try:
@@ -211,7 +213,7 @@ class Resource(object):
 	def unpack(self):
 		if self.mime_type == 'application/zip':
 			logger.debug("Unpacking %s as ZIP", self.path)
-			tempdir = tempfile.mkdtemp()
+			tempdir = tempfile.mkdtemp(TEMPDIR_SUFFIX)
 
 			try:
 				with zipfile.ZipFile(self.path) as zf:
@@ -235,7 +237,7 @@ class Resource(object):
 				clean_silent(tempdir)
 
 		elif self.mime_type == 'message/rfc822' or self.mail_hint:
-			tempdir = tempfile.mkdtemp()
+			tempdir = tempfile.mkdtemp(TEMPDIR_SUFFIX)
 
 			try:
 				with open(self.path) as f:
