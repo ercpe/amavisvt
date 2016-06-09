@@ -224,12 +224,15 @@ class Resource(object):
 
 						t = os.path.join(tempdir, "zipentry-%s" % i)
 						logger.debug("Extracting zipinfo %s to %s", zi, t)
-						with zf.open(zi, 'r') as fi:
-							with open(t, 'w') as fo:
-								tmp = fi.read(BUFFER_SIZE)
-								while tmp:
-									fo.write(tmp)
+						try:
+							with zf.open(zi, 'r') as fi:
+								with open(t, 'w') as fo:
 									tmp = fi.read(BUFFER_SIZE)
+									while tmp:
+										fo.write(tmp)
+										tmp = fi.read(BUFFER_SIZE)
+						except NotImplementedError as nie:
+							logger.info("Skipping %s: %s", zi, nie)
 
 				return tempdir, self
 			except zipfile.error as e:
