@@ -186,6 +186,8 @@ class Resource(object):
 				if len(id_buffer) < BUFFER_SIZE * 4:
 					id_buffer += tmp
 
+				tmp = tmp.encode('utf-8')
+
 				md5hasher.update(tmp)
 				sha1hasher.update(tmp)
 				sha256hasher.update(tmp)
