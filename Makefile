@@ -24,6 +24,7 @@ compile_optimized:
 coverage:
 	coverage erase
 	PYTHONPATH="." coverage run --source='amavisvt' --branch -m py.test -qq tests/
+	coverage xml
 	coverage report -m
 
 clean:
