@@ -2,7 +2,6 @@
 import base64
 import email
 import os
-import uuid
 import zipfile
 
 import magic
@@ -112,8 +111,9 @@ class VTResponse(object):
 
 class Resource(object):
 
-	def __init__(self, path):
+	def __init__(self, path, **kwargs):
 		self.path = path
+		self._no_unpack = kwargs.get('no_unpack', False)
 		self._md5 = None
 		self._sha1 = None
 		self._sha256 = None
@@ -153,7 +153,7 @@ class Resource(object):
 
 	@property
 	def can_unpack(self):
-		return self.mime_type in ('application/zip', 'message/rfc822', )
+		return self.mime_type in ('application/zip', 'message/rfc822', ) and not self._no_unpack
 
 	@property
 	def basename(self):
@@ -224,111 +224,32 @@ class Resource(object):
 		elif self.mime_type == 'message/rfc822':
 			unpack_func = self.unpack_mail
 
-		if unpack_func:
-			try:
-				for res in unpack_func():
-					yield res
-			except Exception as ex:
-				logger.exception("Error unpacking %s" % self)
-
-		# if self.mime_type == 'application/zip':
-		# 	logger.debug("Unpacking %s as ZIP", self.path)
-		# 	tempdir = tempfile.mkdtemp(TEMPDIR_SUFFIX)
-		#
-		# 	try:
-		# 		with zipfile.ZipFile(self.path) as zf:
-		# 			for i, zi in enumerate(zf.infolist()):
-		# 				if i > 1000:
-		# 					logger.warning("Stopping examining zip entry at %s", i)
-		# 					break
-		#
-		# 				t = os.path.join(tempdir, "zipentry-%s" % i)
-		# 				logger.debug("Extracting zipinfo %s to %s", zi, t)
-		# 				try:
-		# 					with zf.open(zi, 'r') as fi:
-		# 						with open(t, 'w') as fo:
-		# 							tmp = fi.read(BUFFER_SIZE)
-		# 							while tmp:
-		# 								fo.write(tmp)
-		# 								tmp = fi.read(BUFFER_SIZE)
-		# 				except NotImplementedError as nie:
-		# 					logger.info("Skipping %s: %s", zi, nie)
-		#
-		# 		return tempdir, self
-		# 	except zipfile.error as e:
-		# 		logger.error("Error unpacking zip file %s: %s", self.path, e)
-		# 		clean_silent(tempdir)
-		#
-		# elif self.mime_type == 'message/rfc822' or self.mail_hint:
-		# 	tempdir = tempfile.mkdtemp(TEMPDIR_SUFFIX)
-		#
-		# 	try:
-		# 		with open(self.path) as f:
-		# 			msg = email.message_from_file(f)
-		#
-		# 		sender = msg.get('From', '<not set>')
-		# 		recipient = msg.get('To', '<not set>')
-		# 		logger.info("Mail from %s to %s", sender, recipient)
-		#
-		# 		payload = msg.get_payload()
-		#
-		# 		if not isinstance(payload, list):
-		# 			logger.debug("Skipping single payload message")
-		# 			return None, None
-		#
-		# 		for i, part in enumerate(payload):
-		# 			if not isinstance(part, email.message.Message):
-		# 				logging.debug("Skipping non-message payload")
-		# 				continue
-		#
-		# 			filename = part.get_filename()
-		# 			partname = "part%s" % i
-		#
-		# 			if not filename:
-		# 				continue
-		#
-		# 			basename, ext = os.path.splitext(filename)
-		#
-		# 			try:
-		# 				partpayload = part.get_payload()
-		# 				if len(partpayload) > 27892121:  # roughly 20 MiB as base64
-		# 					logger.warning("Skipping part (larger than 20MiB")
-		# 				else:
-		# 					outpath = os.path.join(tempdir, "%s%s" % (partname, ext))
-		# 					with open(outpath, 'w') as o:
-		# 						o.write(base64.b64decode(partpayload))
-		#
-		# 					logger.debug("Mail part %s: orig filename: %s, mime type: %s", outpath, filename, Resource(outpath).mime_type)
-		# 			except Exception as ex:
-		# 				logger.error("Could not extract attchment %s: %s", partname, ex)
-		#
-		# 		return tempdir, None
-		# 	except:
-		# 		logger.exception("Failed to parse mail file %s", self.path)
-		# 		clean_silent(tempdir)
-		#
-		# return None, None
+		try:
+			for res in unpack_func():
+				yield res
+		except:
+			logger.exception("Error unpacking %s" % self)
 
 	def unpack_zip(self):
 		logger.debug("Unpacking %s as ZIP", self.path)
 
 		try:
+			yield Resource(self.path, no_unpack=True)
+
 			with zipfile.ZipFile(self.path) as zf:
 				for i, zi in enumerate(zf.infolist()):
 					if i > 1000:
 						logger.warning("Stopping examining zip entry at %s", i)
 						break
 
-					#t = os.path.join(tempdir, "zipentry-%s" % i)
 					_, t = tempfile.mkstemp('-zipentry', prefix='amavisvt-')
 					logger.debug("Extracting zipinfo %s to %s", zi, t)
 					try:
-						with zf.open(zi, 'r') as fi:
-							with open(t, 'w') as fo:
+						with zf.open(zi, 'r') as fi, open(t, 'wb') as fo:
+							tmp = fi.read(BUFFER_SIZE)
+							while tmp:
+								fo.write(tmp)
 								tmp = fi.read(BUFFER_SIZE)
-								while tmp:
-									fo.write(tmp)
-									tmp = fi.read(BUFFER_SIZE)
 
 						yield Resource(t)
 					except NotImplementedError as nie:
@@ -403,10 +324,9 @@ class AmavisVT(object):
 		results = []
 
 		try:
-			mail_resource = Resource(file)
-			self.clean_paths.append(mail_resource.path)
+			start_resource = Resource(file)
 
-			for resource in mail_resource:
+			for resource in start_resource:
 				logger.debug("--> %s, %s, %s, %s: %s", resource, resource.md5, resource.sha1, resource.sha256, resource.mime_type)
 				self.clean_paths.append(resource.path)
 
