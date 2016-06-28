@@ -32,7 +32,10 @@ def clean_silent(paths):
 	for p in paths if isinstance(paths, list) else [paths]:
 		try:
 			logger.debug("Cleaning up: %s", p)
-			shutil.rmtree(p)
+			if os.path.isdir(p):
+				shutil.rmtree(p)
+			else:
+				os.remove(p)
 		except:
 			logger.exception("Could not remove %s", p)
 
@@ -48,8 +51,6 @@ class Configuration(ConfigParser):
 		defaults.setdefault('negative-expire', str(12 * 3600))
 		defaults.setdefault('unknown-expire', str(12 * 3600))
 		defaults.setdefault('api-url', "https://www.virustotal.com/vtapi/v2/file/report")
-		defaults.setdefault('gather-samples', 'false')
-		defaults.setdefault('samples-dir', 'None')
 
 		ConfigParser.__init__(self, defaults=defaults)
 		files_read = self.read([
@@ -82,14 +83,6 @@ class Configuration(ConfigParser):
 	@property
 	def api_url(self):
 		return self.get('DEFAULT', 'api-url')
-
-	@property
-	def gather_samples(self):
-		return (self.get('DEFAULT', 'gather-samples') or "").lower() == "true"
-
-	@property
-	def samples_dir(self):
-		return self.get('DEFAULT', 'samples-dir')
 
 	@property
 	def timeout(self):
@@ -126,7 +119,7 @@ class Resource(object):
 		self._sha256 = None
 		self._mime_type = None
 		self._size = None
-		self._mail_indicator = None
+		#self._mail_indicator = None
 
 	@property
 	def md5(self):
@@ -153,12 +146,6 @@ class Resource(object):
 		return self._mime_type
 
 	@property
-	def mail_hint(self):
-		if self._mail_indicator is None:
-			self.examine()
-		return self._mail_indicator
-
-	@property
 	def size(self):
 		if self._size is None:
 			self._size = os.path.getsize(self.path)
@@ -166,11 +153,27 @@ class Resource(object):
 
 	@property
 	def can_unpack(self):
-		return self.mime_type in ('application/zip', 'message/rfc822', ) or self.mail_hint
+		return self.mime_type in ('application/zip', 'message/rfc822', )
 
 	@property
 	def basename(self):
 		return os.path.basename(self.path)
+
+	def __iter__(self):
+		for x in self._iter_unpacked(self, 10): # todo: make depth configurable
+			yield x
+
+	def _iter_unpacked(self, resource, depth):
+		if depth <= 0:
+			logger.warning("Reached maximum unpack depth - further sub resources will not be checked!")
+			return
+
+		if resource.can_unpack:
+			for subresource in resource.unpack():
+				yield subresource
+
+				for subsubresource in self._iter_unpacked(subresource, depth-1):
+					yield subsubresource
 
 	def examine(self):
 		logger.debug("Examine %s", self.path)
@@ -178,15 +181,16 @@ class Resource(object):
 		sha1hasher = hashlib.sha1()
 		sha256hasher = hashlib.sha256()
 
-		id_buffer = ""
+		id_buffer = b""
 
-		with open(self.path, 'r') as f:
+		with open(self.path, 'rb') as f:
 			tmp = f.read(BUFFER_SIZE)
 			while tmp:
 				if len(id_buffer) < BUFFER_SIZE * 4:
 					id_buffer += tmp
 
-				tmp = tmp.encode('utf-8')
+				#logger.debug(type(tmp))
+				#tmp = tmp.encode('utf-8')
 
 				md5hasher.update(tmp)
 				sha1hasher.update(tmp)
@@ -200,68 +204,159 @@ class Resource(object):
 		with magic.Magic(flags=magic.MAGIC_MIME_TYPE) as m:
 			self._mime_type = m.id_buffer(id_buffer)
 
-			if self._mime_type != 'message/rfc822':
-				if '\n\n' in id_buffer:
-					try:
-						msg = email.message_from_string(id_buffer)
-						self._mail_indicator = len(msg.keys()) and 'From' in msg and 'To' in msg
-						if self._mail_indicator:
-							logger.debug("Identified mail in %s when libmagic could not (said it was %s)", self.basename, self.mime_type)
-					except:
-						self._mail_indicator = False
-				else:
-					self._mail_indicator = False
+			# if self._mime_type != 'message/rfc822':
+			# 	if '\n\n' in id_buffer:
+			# 		try:
+			# 			msg = email.message_from_string(id_buffer)
+			# 			self._mail_indicator = len(msg.keys()) and 'From' in msg and 'To' in msg
+			# 			if self._mail_indicator:
+			# 				logger.debug("Identified mail in %s when libmagic could not (said it was %s)", self.basename, self.mime_type)
+			# 		except:
+			# 			self._mail_indicator = False
+			# 	else:
+			# 		self._mail_indicator = False
 
 	def unpack(self):
+		unpack_func = None
+
 		if self.mime_type == 'application/zip':
-			logger.debug("Unpacking %s as ZIP", self.path)
-			tempdir = tempfile.mkdtemp(TEMPDIR_SUFFIX)
+			unpack_func = self.unpack_zip
+		elif self.mime_type == 'message/rfc822':
+			unpack_func = self.unpack_mail
 
+		if unpack_func:
 			try:
-				with zipfile.ZipFile(self.path) as zf:
-					for i, zi in enumerate(zf.infolist()):
-						if i > 1000:
-							logger.warning("Stopping examining zip entry at %s", i)
-							break
+				for res in unpack_func():
+					yield res
+			except Exception as ex:
+				logger.exception("Error unpacking %s" % self)
 
-						t = os.path.join(tempdir, "zipentry-%s" % i)
-						logger.debug("Extracting zipinfo %s to %s", zi, t)
-						try:
-							with zf.open(zi, 'r') as fi:
-								with open(t, 'w') as fo:
+		# if self.mime_type == 'application/zip':
+		# 	logger.debug("Unpacking %s as ZIP", self.path)
+		# 	tempdir = tempfile.mkdtemp(TEMPDIR_SUFFIX)
+		#
+		# 	try:
+		# 		with zipfile.ZipFile(self.path) as zf:
+		# 			for i, zi in enumerate(zf.infolist()):
+		# 				if i > 1000:
+		# 					logger.warning("Stopping examining zip entry at %s", i)
+		# 					break
+		#
+		# 				t = os.path.join(tempdir, "zipentry-%s" % i)
+		# 				logger.debug("Extracting zipinfo %s to %s", zi, t)
+		# 				try:
+		# 					with zf.open(zi, 'r') as fi:
+		# 						with open(t, 'w') as fo:
+		# 							tmp = fi.read(BUFFER_SIZE)
+		# 							while tmp:
+		# 								fo.write(tmp)
+		# 								tmp = fi.read(BUFFER_SIZE)
+		# 				except NotImplementedError as nie:
+		# 					logger.info("Skipping %s: %s", zi, nie)
+		#
+		# 		return tempdir, self
+		# 	except zipfile.error as e:
+		# 		logger.error("Error unpacking zip file %s: %s", self.path, e)
+		# 		clean_silent(tempdir)
+		#
+		# elif self.mime_type == 'message/rfc822' or self.mail_hint:
+		# 	tempdir = tempfile.mkdtemp(TEMPDIR_SUFFIX)
+		#
+		# 	try:
+		# 		with open(self.path) as f:
+		# 			msg = email.message_from_file(f)
+		#
+		# 		sender = msg.get('From', '<not set>')
+		# 		recipient = msg.get('To', '<not set>')
+		# 		logger.info("Mail from %s to %s", sender, recipient)
+		#
+		# 		payload = msg.get_payload()
+		#
+		# 		if not isinstance(payload, list):
+		# 			logger.debug("Skipping single payload message")
+		# 			return None, None
+		#
+		# 		for i, part in enumerate(payload):
+		# 			if not isinstance(part, email.message.Message):
+		# 				logging.debug("Skipping non-message payload")
+		# 				continue
+		#
+		# 			filename = part.get_filename()
+		# 			partname = "part%s" % i
+		#
+		# 			if not filename:
+		# 				continue
+		#
+		# 			basename, ext = os.path.splitext(filename)
+		#
+		# 			try:
+		# 				partpayload = part.get_payload()
+		# 				if len(partpayload) > 27892121:  # roughly 20 MiB as base64
+		# 					logger.warning("Skipping part (larger than 20MiB")
+		# 				else:
+		# 					outpath = os.path.join(tempdir, "%s%s" % (partname, ext))
+		# 					with open(outpath, 'w') as o:
+		# 						o.write(base64.b64decode(partpayload))
+		#
+		# 					logger.debug("Mail part %s: orig filename: %s, mime type: %s", outpath, filename, Resource(outpath).mime_type)
+		# 			except Exception as ex:
+		# 				logger.error("Could not extract attchment %s: %s", partname, ex)
+		#
+		# 		return tempdir, None
+		# 	except:
+		# 		logger.exception("Failed to parse mail file %s", self.path)
+		# 		clean_silent(tempdir)
+		#
+		# return None, None
+
+	def unpack_zip(self):
+		logger.debug("Unpacking %s as ZIP", self.path)
+
+		try:
+			with zipfile.ZipFile(self.path) as zf:
+				for i, zi in enumerate(zf.infolist()):
+					if i > 1000:
+						logger.warning("Stopping examining zip entry at %s", i)
+						break
+
+					#t = os.path.join(tempdir, "zipentry-%s" % i)
+					_, t = tempfile.mkstemp('-zipentry', prefix='amavisvt-')
+					logger.debug("Extracting zipinfo %s to %s", zi, t)
+					try:
+						with zf.open(zi, 'r') as fi:
+							with open(t, 'w') as fo:
+								tmp = fi.read(BUFFER_SIZE)
+								while tmp:
+									fo.write(tmp)
 									tmp = fi.read(BUFFER_SIZE)
-									while tmp:
-										fo.write(tmp)
-										tmp = fi.read(BUFFER_SIZE)
-						except NotImplementedError as nie:
-							logger.info("Skipping %s: %s", zi, nie)
 
-				return tempdir, self
-			except zipfile.error as e:
-				logger.error("Error unpacking zip file %s: %s", self.path, e)
-				clean_silent(tempdir)
+						yield Resource(t)
+					except NotImplementedError as nie:
+						logger.info("Skipping %s: %s", zi, nie)
 
-		elif self.mime_type == 'message/rfc822' or self.mail_hint:
-			tempdir = tempfile.mkdtemp(TEMPDIR_SUFFIX)
+		except zipfile.error as e:
+			logger.error("Error unpacking zip file %s: %s", self.path, e)
 
-			try:
-				with open(self.path) as f:
-					msg = email.message_from_file(f)
+	def unpack_mail(self):
+		try:
+			with open(self.path) as f:
+				msg = email.message_from_file(f)
 
-				sender = msg.get('From', '<not set>')
-				recipient = msg.get('To', '<not set>')
-				logger.info("Mail from %s to %s", sender, recipient)
+			sender = msg.get('From', '<not set>')
+			recipient = msg.get('To', '<not set>')
+			logger.info("Mail from %s to %s", sender, recipient)
 
-				payload = msg.get_payload()
+			payload = msg.get_payload()
 
-				if not isinstance(payload, list):
-					logger.debug("Skipping single payload message")
-					return None, None
-
+			if isinstance(payload, list):
 				for i, part in enumerate(payload):
 					if not isinstance(part, email.message.Message):
 						logging.debug("Skipping non-message payload")
 						continue
+
+					logger.debug("Mailpart %s", i)
+					for k, v in part.items():
+						logger.debug(" %s: %s", k, v)
 
 					filename = part.get_filename()
 					partname = "part%s" % i
@@ -269,27 +364,26 @@ class Resource(object):
 					if not filename:
 						continue
 
-					basename, ext = os.path.splitext(filename)
-
 					try:
 						partpayload = part.get_payload()
 						if len(partpayload) > 27892121:  # roughly 20 MiB as base64
 							logger.warning("Skipping part (larger than 20MiB")
 						else:
-							outpath = os.path.join(tempdir, "%s%s" % (partname, ext))
+							_, outpath = tempfile.mkstemp('-mailpart', prefix='amavisvt-')
+
 							with open(outpath, 'w') as o:
 								o.write(base64.b64decode(partpayload))
 
-							logger.debug("Mail part %s: orig filename: %s, mime type: %s", outpath, filename, Resource(outpath).mime_type)
+							logger.debug("Mail part %s (%s): orig filename: %s, mime type: %s", i, outpath, filename, Resource(outpath).mime_type)
+
+							yield Resource(outpath)
 					except Exception as ex:
-						logger.error("Could not extract attchment %s: %s", partname, ex)
+						logger.exception("Could not extract attachment %s: %s", partname, ex)
+			else:
+				logger.debug("Skipping single payload message")
 
-				return tempdir, None
-			except:
-				logger.exception("Failed to parse mail file %s", self.path)
-				clean_silent(tempdir)
-
-		return None, None
+		except:
+			logger.exception("Failed to parse mail file %s", self.path)
 
 	def __str__(self):
 		return self.basename
@@ -304,48 +398,33 @@ class AmavisVT(object):
 
 		self.clean_paths = []
 
-	def run(self, paths, recursively=True):
-		results = []
+	def run(self, file):
 		hashes_for_vt = []
+		results = []
 
 		try:
-			for resource in self.find_files(paths, recursively):
-				logger.debug("----> %s, %s, %s, %s: %s", resource, resource.md5, resource.sha1, resource.sha256, resource.mime_type)
+			mail_resource = Resource(file)
+			self.clean_paths.append(mail_resource.path)
 
-				if not self.is_included(resource):
-					logger.debug("Skipping: %s", resource)
-					continue
+			for resource in mail_resource:
+				logger.debug("--> %s, %s, %s, %s: %s", resource, resource.md5, resource.sha1, resource.sha256, resource.mime_type)
+				self.clean_paths.append(resource.path)
 
-				cached_value = self.get_from_cache(resource.sha256)
+				if self.is_included(resource):
+					cached_value = self.get_from_cache(resource.sha256)
 
-				if cached_value:
-					logger.info("Using cached result for file %s (%s): %s", resource, resource.sha256, cached_value)
-					results.append((resource, cached_value))
+					if cached_value:
+						logger.info("Using cached result for file %s (%s): %s", resource, resource.sha256, cached_value)
+						results.append((resource, cached_value))
+					else:
+						hashes_for_vt.append((resource, resource.sha256))
 				else:
-					hashes_for_vt.append((resource, resource.sha256))
+					logger.debug("Skipping resource: %s", resource)
+					continue
 
 			logger.info("Sending %s hashes to Virustotal", len(hashes_for_vt))
 			results.extend(list(self.check_vt(hashes_for_vt)))
-
-			if self.config.gather_samples:
-				temp_dir = os.path.join(self.config.samples_dir, str(uuid.uuid4()))
-
-				try:
-					for resource, result in results:
-						if result is None or result.total is None and self.is_included(resource):
-							if result:
-								logger.debug("Sample gathering: result.total: %s, result.positives: %s", result.total, result.positives)
-							if not os.path.exists(temp_dir):
-								os.makedirs(temp_dir, 0o700)
-
-							dest = os.path.join(temp_dir, os.path.basename(resource.path))
-							logger.info("Saving sample of %s as %s", resource, dest)
-							shutil.copy(resource.path, dest)
-				except:
-					logger.exception("Sample gathering failed")
-
 			return results
-
 		finally:
 			clean_silent(self.clean_paths)
 
@@ -356,46 +435,10 @@ class AmavisVT(object):
 					lambda r: re.search(r"\.(exe|com|zip|tar\.[\w\d]+|doc\w?|xls\w?|ppt\w?|pdf|js|bat|cmd|rtf|ttf|html?)$", r.basename, re.IGNORECASE)
 		]))
 
-	def find_files(self, paths, recursively, auto_unpack=True):
-
-		def _inner():
-			examine_paths = paths if isinstance(paths, list) else [paths]
-
-			for path in examine_paths:
-				path = os.path.abspath(os.path.expanduser(path))
-
-				if os.path.isfile(path):
-					yield Resource(path)
-				elif os.path.isdir(path):
-					for root, dirs, files in os.walk(path):
-						for f in files:
-							yield Resource(os.path.join(root, f))
-
-						if not recursively:
-							break
-
-		for resource in _inner():
-			if resource.size == 0:
-				continue
-
-			if resource.can_unpack and auto_unpack:
-				try:
-					tempdir, res = resource.unpack()
-
-					if tempdir is not None:
-						self.clean_paths.append(tempdir)
-
-						for subresource in self.find_files(tempdir, False):
-							yield subresource
-
-					if res:
-						yield res
-				except:
-					logger.exception("Unpacking %s failed", resource)
-			else:
-				yield resource
-
 	def check_vt(self, checksums):
+		logger.error("FIXME FIXME FIXME")
+		return
+
 		if not checksums:
 			return
 
