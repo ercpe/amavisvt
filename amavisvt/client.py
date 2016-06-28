@@ -356,9 +356,6 @@ class AmavisVT(object):
 		]))
 
 	def check_vt(self, checksums):
-		logger.error("FIXME FIXME FIXME")
-		return
-
 		if not checksums:
 			return
 
