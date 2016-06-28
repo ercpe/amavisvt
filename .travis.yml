@@ -1,0 +1,16 @@
+language: python
+python:
+  - 2.7
+  - 3.4
+  - 3.5
+  - pypy
+  - nightly # 3.6
+
+install:
+- pip install -r requirements.txt
+- pip install coveralls
+
+script: make travis
+
+after_success:
+  - coveralls
