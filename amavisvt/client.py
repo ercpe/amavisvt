@@ -113,6 +113,7 @@ class Resource(object):
 
 	def __init__(self, path, **kwargs):
 		self.path = path
+		self._filename = kwargs.get('filename', None)
 		self._no_unpack = kwargs.get('no_unpack', False)
 		self._md5 = None
 		self._sha1 = None
@@ -156,8 +157,8 @@ class Resource(object):
 		return self.mime_type in ('application/zip', 'message/rfc822', ) and not self._no_unpack
 
 	@property
-	def basename(self):
-		return os.path.basename(self.path)
+	def filename(self):
+		return self._filename or os.path.basename(self.path)
 
 	def __iter__(self):
 		for x in self._iter_unpacked(self, 10): # todo: make depth configurable
@@ -171,7 +172,6 @@ class Resource(object):
 		if resource.can_unpack:
 			for subresource in resource.unpack():
 				yield subresource
-
 				for subsubresource in self._iter_unpacked(subresource, depth-1):
 					yield subsubresource
 
@@ -234,8 +234,6 @@ class Resource(object):
 		logger.debug("Unpacking %s as ZIP", self.path)
 
 		try:
-			yield Resource(self.path, no_unpack=True)
-
 			with zipfile.ZipFile(self.path) as zf:
 				for i, zi in enumerate(zf.infolist()):
 					if i > 1000:
@@ -243,7 +241,7 @@ class Resource(object):
 						break
 
 					_, t = tempfile.mkstemp('-zipentry', prefix='amavisvt-')
-					logger.debug("Extracting zipinfo %s to %s", zi, t)
+					logger.debug("Extracting entry %s to %s", zi.filename, t)
 					try:
 						with zf.open(zi, 'r') as fi, open(t, 'wb') as fo:
 							tmp = fi.read(BUFFER_SIZE)
@@ -251,7 +249,7 @@ class Resource(object):
 								fo.write(tmp)
 								tmp = fi.read(BUFFER_SIZE)
 
-						yield Resource(t)
+						yield Resource(t, filename=zi.filename)
 					except NotImplementedError as nie:
 						logger.info("Skipping %s: %s", zi, nie)
 
@@ -307,8 +305,7 @@ class Resource(object):
 			logger.exception("Failed to parse mail file %s", self.path)
 
 	def __str__(self):
-		return self.basename
-
+		return self.filename
 
 class AmavisVT(object):
 	buffer_size = 4096
@@ -326,9 +323,9 @@ class AmavisVT(object):
 		try:
 			start_resource = Resource(file)
 
-			for resource in start_resource:
-				logger.debug("--> %s, %s, %s, %s: %s", resource, resource.md5, resource.sha1, resource.sha256, resource.mime_type)
-				self.clean_paths.append(resource.path)
+			for resource in [start_resource] + list(start_resource):
+				if resource.path != start_resource.path:
+					self.clean_paths.append(resource.path)
 
 				if self.is_included(resource):
 					cached_value = self.get_from_cache(resource.sha256)
@@ -352,10 +349,15 @@ class AmavisVT(object):
 		return any((f(resource) for f in [
 					lambda r: r.mime_type.startswith('application/'),
 					lambda r: r.mime_type in ('text/x-shellscript', 'text/x-perl', 'text/x-ruby', 'text/x-python'),
-					lambda r: re.search(r"\.(exe|com|zip|tar\.[\w\d]+|doc\w?|xls\w?|ppt\w?|pdf|js|bat|cmd|rtf|ttf|html?)$", r.basename, re.IGNORECASE)
+					lambda r: re.search(r"\.(exe|com|zip|tar\.[\w\d]+|doc\w?|xls\w?|ppt\w?|pdf|js|bat|cmd|rtf|ttf|html?)$", r.filename, re.IGNORECASE)
 		]))
 
 	def check_vt(self, checksums):
+		logger.info("DUMMY:")
+		for filename, checksum in checksums:
+			logger.debug(" %s = %s", filename, checksum)
+
+		return
 		if not checksums:
 			return
 
