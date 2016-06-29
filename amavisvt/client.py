@@ -143,7 +143,6 @@ class Resource(object):
 	def mime_type(self):
 		if self._mime_type is None:
 			self.examine()
-			print("mime type after examine(): %s. can unpack: %s" % (self._mime_type, self.can_unpack))
 		return self._mime_type
 
 	@property
@@ -209,7 +208,7 @@ class Resource(object):
 						logger.debug("Identified mail in %s when libmagic could not (said it was %s)", self.filename, self.mime_type)
 						self._mime_type = 'message/rfc822'
 				except Exception as ex:
-					print(ex)
+					pass
 
 	def unpack(self):
 		unpack_func = None
@@ -348,11 +347,6 @@ class AmavisVT(object):
 		]))
 
 	def check_vt(self, checksums):
-		logger.info("DUMMY:")
-		for filename, checksum in checksums:
-			logger.debug(" %s = %s", filename, checksum)
-
-		return
 		if not checksums:
 			return
 
