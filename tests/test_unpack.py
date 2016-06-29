@@ -29,7 +29,7 @@ class TestUnpack(object):
 		assert r.sha256 == "8179aa7716740f099a43d6c0aa8b77622dbbd7050bc56ce21cda2109444cf3d6"
 		assert r.mime_type == 'message/rfc822'
 
-	def test_zip(self):
+	def test_unpack_zip(self):
 		path = self._resource('textfile.zip')
 		r = Resource(path)
 		assert r.can_unpack
@@ -48,6 +48,30 @@ class TestUnpack(object):
 		assert text_resource.sha1 == "f10e562d8825ec2e17e0d9f58646f8084a658cfa"
 		assert text_resource.sha256 == "e5ce4d21e7300ab8106d6c96e1464ae69124eb34371436b5bae6cc920cbdc6a0"
 		assert text_resource.mime_type == "text/plain"
+
+		for x in resources:
+			if not x.path == r.path:
+				os.remove(x.path)
+
+	def test_unpack_mail(self):
+		path = self._resource('mail_with_attachment.eml')
+		r = Resource(path)
+		assert r.mime_type == "message/rfc822"
+		assert r.can_unpack
+		assert r.md5 == "b9a864ccc860e4f30193c7b75de116cf"
+		assert r.sha1 == "5e1b7f725dad50407871b02a4a4558da0c734317"
+		assert r.sha256 == "0eb18a25bcc56ca4b503b1406d9af35928e754aebbe55452299c9cf2cd8245f1"
+
+		resources = list(r.unpack())
+
+		assert len(resources) == 1
+
+		zip_attachment = resources[0]
+		assert zip_attachment.can_unpack
+		assert zip_attachment.md5 == "e77d94e09fbcf6641c1f848d98963298"
+		assert zip_attachment.sha1 == "acbfc25a642cb7fa574f38a361932d1c2fdc1a9e"
+		assert zip_attachment.sha256 == "93440551540584e48d911586606c319744c8e671c20ee6b12cca4b922127a127"
+		assert zip_attachment.mime_type == "application/zip"
 
 		for x in resources:
 			if not x.path == r.path:

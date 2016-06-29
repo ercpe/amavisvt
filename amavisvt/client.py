@@ -42,9 +42,8 @@ def clean_silent(paths):
 class Configuration(ConfigParser):
 	def __init__(self, cliargs=None):
 		defaults = cliargs or {}
-		for k in defaults.keys():
-			if not defaults[k]:
-				del defaults[k]
+		for k in [k for k in defaults.keys() if not defaults[k]]:
+			del defaults[k]
 
 		defaults.setdefault('positive-expire', str(21 * 86400))
 		defaults.setdefault('negative-expire', str(12 * 3600))
@@ -144,6 +143,7 @@ class Resource(object):
 	def mime_type(self):
 		if self._mime_type is None:
 			self.examine()
+			print("mime type after examine(): %s. can unpack: %s" % (self._mime_type, self.can_unpack))
 		return self._mime_type
 
 	@property
@@ -189,9 +189,6 @@ class Resource(object):
 				if len(id_buffer) < BUFFER_SIZE * 4:
 					id_buffer += tmp
 
-				#logger.debug(type(tmp))
-				#tmp = tmp.encode('utf-8')
-
 				md5hasher.update(tmp)
 				sha1hasher.update(tmp)
 				sha256hasher.update(tmp)
@@ -203,18 +200,16 @@ class Resource(object):
 
 		with magic.Magic(flags=magic.MAGIC_MIME_TYPE) as m:
 			self._mime_type = m.id_buffer(id_buffer)
+			logger.debug("libmagic identified %s as: %s", self, self._mime_type)
 
-			# if self._mime_type != 'message/rfc822':
-			# 	if '\n\n' in id_buffer:
-			# 		try:
-			# 			msg = email.message_from_string(id_buffer)
-			# 			self._mail_indicator = len(msg.keys()) and 'From' in msg and 'To' in msg
-			# 			if self._mail_indicator:
-			# 				logger.debug("Identified mail in %s when libmagic could not (said it was %s)", self.basename, self.mime_type)
-			# 		except:
-			# 			self._mail_indicator = False
-			# 	else:
-			# 		self._mail_indicator = False
+			if self._mime_type in ('text/plain', 'text/html'):
+				try:
+					msg = email.message_from_string(id_buffer.decode('utf-8'))
+					if len(msg.keys()) and 'From' in msg and 'To' in msg:
+						logger.debug("Identified mail in %s when libmagic could not (said it was %s)", self.filename, self.mime_type)
+						self._mime_type = 'message/rfc822'
+				except Exception as ex:
+					print(ex)
 
 	def unpack(self):
 		unpack_func = None
@@ -290,12 +285,12 @@ class Resource(object):
 						else:
 							_, outpath = tempfile.mkstemp('-mailpart', prefix='amavisvt-')
 
-							with open(outpath, 'w') as o:
+							with open(outpath, 'wb') as o:
 								o.write(base64.b64decode(partpayload))
 
 							logger.debug("Mail part %s (%s): orig filename: %s, mime type: %s", i, outpath, filename, Resource(outpath).mime_type)
 
-							yield Resource(outpath)
+							yield Resource(outpath, filename=filename)
 					except Exception as ex:
 						logger.exception("Could not extract attachment %s: %s", partname, ex)
 			else:
