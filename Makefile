@@ -1,15 +1,15 @@
 TARGET?=tests
 
 test_default_python:
-	PYTHONPATH="." python -m pytest tests/ -v
+	PYTHONPATH="." python -m pytest tests/ --junit-xml testresults.xml -v
 
 test_py2:
 	@echo Executing test with python2
-	PYTHONPATH="." python2 -m pytest tests/ -v
+	PYTHONPATH="." python2 -m pytest tests/ --junit-xml testresults.xml -v
 
 test_py3:
 	@echo Executing test with python3
-	PYTHONPATH="." python3 -m pytest tests/ -v
+	PYTHONPATH="." python3 -m pytest tests/ --junit-xml testresults.xml -v
 
 test: test_py2 test_py3
 
@@ -24,6 +24,7 @@ compile_optimized:
 coverage:
 	coverage erase
 	PYTHONPATH="." coverage run --source='amavisvt' --branch -m py.test -qq tests/
+	coverage xml
 	coverage report -m
 
 clean:
