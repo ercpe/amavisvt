@@ -7,6 +7,8 @@ Before you think about integrating it into your mailserver, please have in mind 
 
 In future versions, `amavisvt` may integrate configurable filter for the mime types and/or file extensions.
 
+[![Build Status](https://travis-ci.org/ercpe/amavisvt.svg?branch=master)](https://travis-ci.org/ercpe/amavisvt) [![Coverage Status](https://coveralls.io/repos/github/ercpe/amavisvt/badge.svg?branch=master)](https://coveralls.io/github/ercpe/amavisvt?branch=master)
+
 
 # Installation
 
