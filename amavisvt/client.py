@@ -14,18 +14,18 @@ import tempfile
 
 import shutil
 
-from amavisvt import VERSION
-
 logger = logging.getLogger(__name__)
+
+from amavisvt import VERSION
+from amavisvt.db import Database
 
 try:
 	from ConfigParser import SafeConfigParser as ConfigParser
 except ImportError:
 	from configparser import ConfigParser
 
-BUFFER_SIZE = 4096
 
-TEMPDIR_SUFFIX='-amavisvt'
+BUFFER_SIZE = 4096
 
 def clean_silent(paths):
 	for p in paths if isinstance(paths, list) else [paths]:
@@ -123,7 +123,6 @@ class Resource(object):
 		self._sha256 = None
 		self._mime_type = None
 		self._size = None
-		#self._mail_indicator = None
 
 	@property
 	def md5(self):
@@ -311,6 +310,7 @@ class AmavisVT(object):
 	def __init__(self, config, memcached_servers=None):
 		self.config = config
 		self.memcached = memcache.Client(memcached_servers or ['127.0.0.1:11211'])
+		self.database = Database('/tmp/amavisvt.sqlite3') # FIXME: database path
 
 		self.clean_paths = []
 
