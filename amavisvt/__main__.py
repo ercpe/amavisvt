@@ -17,6 +17,7 @@ def main(args):
 		'hits-required': "5",
 		'scan-zips': str(args.scan_zips).lower(),
 		'timeout': str(args.timeout),
+		'pretend': str(args.pretend),
 	})
 
 	detected = False
@@ -44,6 +45,7 @@ if __name__ == "__main__":
 	parser.add_argument('-d', '--debug', action='store_true', default=False, help='Send verbose log messages to stdout too')
 	parser.add_argument('-z', '--scan-zips', action='store_true', default=False)
 	parser.add_argument('-t', '--timeout', default=10, help='Request timeout in seconds (default: %(default)s)')
+	parser.add_argument('-p', '--pretend', action='store_true', default=False, help='Don\'t actually send requests to Virustotal')
 
 	args = parser.parse_args()
 

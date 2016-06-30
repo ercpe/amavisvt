@@ -86,6 +86,10 @@ class Configuration(ConfigParser):
 	def timeout(self):
 		return self.get('DEFAULT', 'timeout')
 
+	@property
+	def pretend(self):
+		return (self.get('DEFAULT', 'pretend') or "false").lower() == "true"
+
 
 class VTResponse(object):
 	def __init__(self, virustotal_response):
@@ -347,6 +351,10 @@ class AmavisVT(object):
 		]))
 
 	def check_vt(self, checksums):
+		if self.config.pretend:
+			logger.info("NOT sending requests to virustotal")
+			return
+
 		if not checksums:
 			return
 
