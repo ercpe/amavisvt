@@ -94,6 +94,7 @@ class Configuration(ConfigParser):
 class VTResponse(object):
 	def __init__(self, virustotal_response):
 		self._data = virustotal_response
+		self.infected = False
 
 	resource = property(lambda self: self._data['resource'])
 	response_code = property(lambda self: self._data['response_code'])
@@ -337,11 +338,17 @@ class AmavisVT(object):
 					logger.debug("Skipping resource: %s", resource)
 					continue
 
+			self.database.add_resource(start_resource)
+
 			logger.info("Sending %s hashes to Virustotal", len(hashes_for_vt))
 			results.extend(list(self.check_vt(hashes_for_vt)))
+
+			self.database.update_patterns()
+
 			return results
 		finally:
 			clean_silent(self.clean_paths)
+			self.database.clean()
 
 	def is_included(self, resource):
 		return any((f(resource) for f in [
