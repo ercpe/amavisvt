@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from __future__ import division
 import logging
 import sqlite3
 import datetime
@@ -32,8 +33,8 @@ MIGRATIONS = (
 class AmavisVTDatabase(BaseDatabase):
 
 	def connect(self):
-		logger.debug("Connecting to database %s", self.db_path)
-		self.conn = sqlite3.connect(self.db_path)
+		logger.debug("Connecting to database %s", self.config.database_path)
+		self.conn = sqlite3.connect(self.config.database_path)
 		self.check_schema()
 
 	def check_schema(self):
@@ -151,3 +152,40 @@ class AmavisVTDatabase(BaseDatabase):
 		cursor.execute(sql, (min_date, ))
 		self.conn.commit()
 		cursor.close()
+
+	def filename_pattern_match(self, filename):
+		pattern = patterns.calculate(filename, self.get_filenames())
+
+		if not pattern:
+			logger.debug("No pattern for filename '%s'.", filename)
+			return
+
+		logger.debug("Checking database for pattern: %s", pattern)
+		sql = """SELECT DISTINCT
+					f.pattern,
+					(SELECT COUNT(*) FROM filenames f2 WHERE f2.pattern = f.pattern) AS total_cnt,
+					(SELECT COUNT(*) FROM filenames f3 WHERE f3.pattern = f.pattern AND f3.infected=1) AS infected_cnt
+				FROM filenames f
+				WHERE f.pattern = ?"""
+
+		cursor = self.conn.cursor()
+		cursor.execute(sql, (pattern, ))
+		result = cursor.fetchone()
+		self.conn.commit()
+		cursor.close()
+
+		if not result:
+			return False
+
+		pattern, total, infected = result
+		logger.info("Database result for '%s': total: %s, infected: %s", pattern, total, infected)
+
+		infected_percent = infected / total
+
+		logger.debug("Requirements: %s total matches, %s total (is: %s, %s infected)",
+					self.config.min_filename_patterns,
+					self.config.min_infected_percent,
+					total,
+					infected_percent)
+
+		return total >= self.config.min_filename_patterns and infected_percent >= self.config.min_infected_percent

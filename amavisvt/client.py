@@ -14,6 +14,8 @@ import tempfile
 
 import shutil
 
+from amavisvt.db.base import NoopDatabase
+
 logger = logging.getLogger(__name__)
 
 from amavisvt import VERSION
@@ -49,6 +51,13 @@ class Configuration(ConfigParser):
 		defaults.setdefault('negative-expire', str(12 * 3600))
 		defaults.setdefault('unknown-expire', str(12 * 3600))
 		defaults.setdefault('api-url', "https://www.virustotal.com/vtapi/v2/file/report")
+		defaults.setdefault('report-url', "https://www.virustotal.com/vtapi/v2/file/scan")
+		defaults.setdefault('database-path', '/var/lib/amavisvt/amavisvt.sqlite3')
+
+		defaults.setdefault('filename-pattern-detection', 'false')
+		defaults.setdefault('min-filename-patterns', '20')
+		defaults.setdefault('infected-percent', '0.4')
+		defaults.setdefault('auto-report', 'false')
 
 		ConfigParser.__init__(self, defaults=defaults)
 		files_read = self.read([
@@ -83,12 +92,36 @@ class Configuration(ConfigParser):
 		return self.get('DEFAULT', 'api-url')
 
 	@property
+	def report_url(self):
+		return self.get('DEFAULT', 'report-url')
+
+	@property
 	def timeout(self):
 		return self.get('DEFAULT', 'timeout')
 
 	@property
 	def pretend(self):
 		return (self.get('DEFAULT', 'pretend') or "false").lower() == "true"
+
+	@property
+	def database_path(self):
+		return self.get('DEFAULT', 'database-path')
+
+	@property
+	def filename_pattern_detection(self):
+		return self.get('DEFAULT', 'filename-pattern-detection').lower() == "true"
+
+	@property
+	def min_filename_patterns(self):
+		return int(self.get('DEFAULT', 'min-filename-patterns'))
+
+	@property
+	def min_infected_percent(self):
+		return float(self.get('DEFAULT', 'infected-percent'))
+
+	@property
+	def auto_report(self):
+		return self.get('DEFAULT', 'auto-report').lower() == "true"
 
 
 class VTResponse(object):
@@ -98,11 +131,11 @@ class VTResponse(object):
 
 	resource = property(lambda self: self._data['resource'])
 	response_code = property(lambda self: self._data['response_code'])
-	verbose_message = property(lambda self:  self._data['verbose_msg'])
+	verbose_message = property(lambda self: self._data['verbose_msg'])
 	md5 = property(lambda self: self._data.get('md5'))
 	permalink = property(lambda self: self._data.get('permalink'))
 	positives = property(lambda self: int(self._data.get('positives', 0)))
-	scan_date = property(lambda self:  self._data.get('scan_date'))
+	scan_date = property(lambda self: self._data.get('scan_date'))
 	scan_id = property(lambda self: self._data.get('scan_id'))
 	scans = property(lambda self: self._data.get('scans'))
 	sha1 = property(lambda self: self._data.get('sha1'))
@@ -110,7 +143,26 @@ class VTResponse(object):
 	total = property(lambda self: self._data.get('total'))
 
 	def __str__(self):
-		return "%s: %s (Positives: %s of %s)" % (self.resource, self.verbose_message, self.positives, self.total)
+		if self.positives is not None and self.total is not None:
+			return "%s: %s (Positives: %s of %s)" % (self.resource, self.verbose_message, self.positives, self.total)
+		return "%s: %s" % (self.resource, self.verbose_message)
+
+
+class FilenameResponse(VTResponse):
+
+	def __init__(self):
+		super(FilenameResponse, self).__init__(virustotal_response={
+			'scans': {
+				'filename pattern': {
+					'detected': True,
+					'result': 'filename pattern matches infected files'
+				}
+			},
+			'positives': 1,
+			'total': 1,
+			'sha256': '',
+		})
+		self.infected = True
 
 
 class Resource(object):
@@ -305,13 +357,18 @@ class Resource(object):
 	def __str__(self):
 		return self.filename
 
+
 class AmavisVT(object):
 	buffer_size = 4096
 
 	def __init__(self, config, memcached_servers=None):
 		self.config = config
 		self.memcached = memcache.Client(memcached_servers or ['127.0.0.1:11211'])
-		self.database = Database('/tmp/amavisvt.sqlite3') # FIXME: database path
+		try:
+			self.database = Database(config)
+		except:
+			logger.exception("Error opening database")
+			self.database = NoopDatabase(config)
 
 		self.clean_paths = []
 
@@ -339,7 +396,27 @@ class AmavisVT(object):
 					continue
 
 			logger.info("Sending %s hashes to Virustotal", len(hashes_for_vt))
-			results.extend(list(self.check_vt(hashes_for_vt)))
+			vt_results = list(self.check_vt(hashes_for_vt))
+
+			if self.config.filename_pattern_detection:
+				logger.debug("Filename pattern detection enabled")
+
+				for resource, sha256 in hashes_for_vt:
+					vtresult = [r for _, r in vt_results if r and r.sha256 == sha256]
+					vtresult = vtresult[0] if vtresult else None
+
+					if vtresult and vtresult.infected:
+						continue
+
+					if self.database.filename_pattern_match(resource.filename):
+						logger.info("Flagging attachment %s as INFECTED (identified via filename pattern)", resource.filename)
+
+						results.append((resource, FilenameResponse()))
+
+						if self.config.auto_report:
+							self.report_to_vt(resource)
+
+			results.extend(vt_results)
 
 			# add the main resource to the database using the VTResponse from upstream (or cache)
 			start_resource_result = [r for _, r in results if r and r.sha256 == start_resource.sha256]
@@ -411,6 +488,34 @@ class AmavisVT(object):
 					logger.warn("Got no response for %s (%s)", filename, checksum)
 		except:
 			logger.exception("Error asking virustotal about files")
+
+	def report_to_vt(self, resource):
+		if self.config.pretend:
+			logger.info("NOT sending resource to virustotal")
+			return
+
+		try:
+			logger.info("Reporting resource %s to virustotal", resource)
+
+			files = {
+				'file': open(resource.path, 'rb'),
+			}
+			response = requests.post(self.config.report_url, data={
+										'apikey': self.config.apikey,
+									},
+									files=files,
+									timeout=float(self.config.timeout),
+									headers={
+										'User-Agent': 'amavisvt/%s (+https://ercpe.de/projects/amavisvt)' % VERSION
+									})
+			response.raise_for_status()
+			if response.status_code == 204:
+				raise Exception("API-Limit exceeded!")
+
+			vtr = VTResponse(response.json())
+			logger.info("Report result: %s", vtr)
+		except:
+			logger.exception("Error reporting %s to virustotal", resource)
 
 	def get_from_cache(self, sha256hash):
 		from_cache = self.memcached.get(sha256hash)

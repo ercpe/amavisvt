@@ -2,8 +2,8 @@
 
 class BaseDatabase(object):
 
-	def __init__(self, path):
-		self.db_path = path
+	def __init__(self, config):
+		self.config = config
 		self.conn = None
 		self.connect()
 
@@ -25,6 +25,10 @@ class BaseDatabase(object):
 	def clean(self):
 		raise NotImplementedError
 
+	def filename_pattern_match(self, filename):
+		raise NotImplementedError
+
+
 class NoopDatabase(BaseDatabase):
 	def connect(self):
 		pass
@@ -42,4 +46,7 @@ class NoopDatabase(BaseDatabase):
 		pass
 
 	def clean(self):
+		pass
+
+	def filename_pattern_match(self, filename):
 		pass
