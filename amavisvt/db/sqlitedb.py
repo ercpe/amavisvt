@@ -11,9 +11,6 @@ logger = logging.getLogger(__name__)
 
 LATEST_SCHEMA_VERSION = 1
 
-# sqlite3.register_adapter(bool, int)
-# sqlite3.register_converter("BOOLEAN", lambda v: bool(int(v)))
-
 MIGRATIONS = (
 	(), # version 0
 	(  # version 1
@@ -31,6 +28,10 @@ MIGRATIONS = (
 )
 
 class AmavisVTDatabase(BaseDatabase):
+
+	def __init__(self, *args, **kwargs):
+		self.schema_version = 0
+		super(AmavisVTDatabase, self).__init__(*args, **kwargs)
 
 	def connect(self):
 		logger.debug("Connecting to database %s", self.config.database_path)
@@ -51,6 +52,8 @@ class AmavisVTDatabase(BaseDatabase):
 
 		if schema_version < LATEST_SCHEMA_VERSION:
 			self.migrate_schema(schema_version)
+		else:
+			self.schema_version = schema_version
 
 	def close(self):
 		logger.debug("Disconnecting database")
@@ -80,6 +83,7 @@ class AmavisVTDatabase(BaseDatabase):
 		cursor.execute("UPDATE schema_version SET version=?", (version, ))
 		self.conn.commit()
 		cursor.close()
+		self.schema_version = version
 
 	def add_resource(self, resource, vtresult=None):
 		insert_sql = 'INSERT INTO filenames (filename, pattern, infected, "timestamp", sha256) VALUES (?, ?, ?, ?, ?)'
