@@ -3,6 +3,19 @@
 import os
 from amavisvt.client import Resource
 
+class UnpackExceptionResource(Resource):
+
+	@property
+	def mime_type(self):
+		return 'application/zip'
+
+	def unpack_mail(self):
+		raise Exception("TEst")
+
+	def unpack_zip(self):
+		raise Exception("TEst")
+
+
 class TestUnpack(object):
 	samples_dir = os.path.join(os.path.dirname(__file__), 'samples')
 
@@ -149,3 +162,7 @@ class TestUnpack(object):
 		assert resources[9].sha1 == "ff9f379a1ea12b5cd88be15112846c3d60efaa84"
 		assert resources[9].sha256 == "c20768a77532d80ee9985d2f260412c5478980269e5c11a806afb355970b1e63"
 		assert resources[9].mime_type == "text/x-shellscript"
+
+	def test_unpack_error(self):
+		uer = UnpackExceptionResource('/dev/null')
+		assert not list(uer.unpack())
