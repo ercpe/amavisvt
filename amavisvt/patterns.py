@@ -8,6 +8,9 @@ chunk_re = re.compile(r'[_\-\.]', re.IGNORECASE | re.UNICODE)
 MIN_CHUNKS = 2
 
 def calculate(s, choices):
+	if not (s or "").strip():
+		return None
+
 	chunks = chunk_re.split(s)
 
 	if len(chunks) <= MIN_CHUNKS:
