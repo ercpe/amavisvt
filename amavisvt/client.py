@@ -42,7 +42,7 @@ def clean_silent(paths):
 
 
 class Configuration(ConfigParser):
-	def __init__(self, cliargs=None):
+	def __init__(self, cliargs=None, **kwargs):
 		defaults = cliargs or {}
 		for k in [k for k in defaults.keys() if not defaults[k]]:
 			del defaults[k]
@@ -50,21 +50,29 @@ class Configuration(ConfigParser):
 		defaults.setdefault('positive-expire', str(21 * 86400))
 		defaults.setdefault('negative-expire', str(12 * 3600))
 		defaults.setdefault('unknown-expire', str(12 * 3600))
+		defaults.setdefault('timeout', '10')
+		defaults.setdefault('hits-required', "5")
+		defaults.setdefault('pretend', 'false')
 		defaults.setdefault('api-url', "https://www.virustotal.com/vtapi/v2/file/report")
 		defaults.setdefault('report-url', "https://www.virustotal.com/vtapi/v2/file/scan")
 		defaults.setdefault('database-path', '/var/lib/amavisvt/amavisvt.sqlite3')
 
 		defaults.setdefault('filename-pattern-detection', 'false')
 		defaults.setdefault('min-filename-patterns', '20')
-		defaults.setdefault('infected-percent', '0.4')
+		defaults.setdefault('infected-percent', '0.7')
 		defaults.setdefault('auto-report', 'false')
 
 		ConfigParser.__init__(self, defaults=defaults)
-		files_read = self.read([
-			'/etc/amavisvt.cfg',
-			os.path.expanduser('~/.amavisvt.cfg'),
-			'amavisvt.cfg'
-		])
+		paths = kwargs.get('path', None)
+		if paths:
+			paths = [paths]
+		else:
+			paths = [
+				'/etc/amavisvt.cfg',
+				os.path.expanduser('~/.amavisvt.cfg'),
+				'amavisvt.cfg'
+			]
+		files_read = self.read(paths)
 		logger.info("Read configuration files: %s", files_read)
 
 	@property
@@ -97,7 +105,7 @@ class Configuration(ConfigParser):
 
 	@property
 	def timeout(self):
-		return self.get('DEFAULT', 'timeout')
+		return int(self.get('DEFAULT', 'timeout'))
 
 	@property
 	def pretend(self):
