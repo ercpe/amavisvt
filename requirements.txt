@@ -2,3 +2,4 @@
 requests
 filemagic
 python-memcached
+fuzzywuzzy
