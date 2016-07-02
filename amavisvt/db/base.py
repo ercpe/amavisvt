@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-class BaseDatabase(object):
+class BaseDatabase(object):  # pragma: no cover
 
 	def __init__(self, config):
 		self.config = config
@@ -29,7 +29,7 @@ class BaseDatabase(object):
 		raise NotImplementedError
 
 
-class NoopDatabase(BaseDatabase):
+class NoopDatabase(BaseDatabase):  # pragma: no cover
 	def connect(self):
 		pass
 
