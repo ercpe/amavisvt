@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from amavisvt.client import AmavisVT, Configuration, Resource
+from amavisvt.db.base import NoopDatabase
 
 
 class DummyResource(Resource):
@@ -60,3 +61,11 @@ class TestClient(object):
 		assert not avt.is_included(DummyResource(mime_type='text/plain'))
 		assert not avt.is_included(DummyResource(mime_type='message/rfc822'))
 		assert not avt.is_included(DummyResource(mime_type='image/png'))
+
+	def test_database_fallback(self):
+		c = Configuration({
+			'database-path': '/dev/null',
+		}, path='/dev/null')
+		avt = AmavisVT(c)
+
+		assert isinstance(avt.database, NoopDatabase)
