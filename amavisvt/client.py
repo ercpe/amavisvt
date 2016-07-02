@@ -139,7 +139,7 @@ class VTResponse(object):
 
 	resource = property(lambda self: self._data['resource'])
 	response_code = property(lambda self: self._data['response_code'])
-	verbose_message = property(lambda self: self._data['verbose_msg'])
+	verbose_message = property(lambda self: self._data.get('verbose_msg', ''))
 	md5 = property(lambda self: self._data.get('md5'))
 	permalink = property(lambda self: self._data.get('permalink'))
 	positives = property(lambda self: int(self._data.get('positives', 0)))
@@ -151,15 +151,14 @@ class VTResponse(object):
 	total = property(lambda self: self._data.get('total'))
 
 	def __str__(self):
-		if self.positives is not None and self.total is not None:
-			return "%s: %s (Positives: %s of %s)" % (self.resource, self.verbose_message, self.positives, self.total)
-		return "%s: %s" % (self.resource, self.verbose_message)
+		return "%s: %s" % (self.resource, self.verbose_message or '<no message>')
 
 
 class FilenameResponse(VTResponse):
 
 	def __init__(self):
 		super(FilenameResponse, self).__init__(virustotal_response={
+			'resource': '<filename>',
 			'scans': {
 				'filename pattern': {
 					'detected': True,
