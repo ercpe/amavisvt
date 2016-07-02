@@ -48,11 +48,8 @@ class TestAmavisVTDatabase(object):
 		testdb.conn.commit()
 
 		cursor = testdb.conn.cursor()
-		cursor.execute("""INSERT INTO filenames (filename, pattern, infected, timestamp, sha256) VALUES
-			('foo', 'foo', 0, 0, 'foo'),
-			('bar', 'bar', 0, 0, 'bar'),
-			('baz', 'baz', 0, 0, 'baz')
-		""")
+		cursor.execute("INSERT INTO filenames (filename, pattern, infected, timestamp, sha256) VALUES " +
+							"('foo', 'foo', 0, 0, 'foo'), ('bar', 'bar', 0, 0, 'bar'), ('baz', 'baz', 0, 0, 'baz')")
 		testdb.conn.commit()
 
 		assert sorted(testdb.get_filenames()) == ['bar', 'baz', 'foo']
