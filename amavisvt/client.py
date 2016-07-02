@@ -257,13 +257,16 @@ class Resource(object):
 			self._mime_type = m.id_buffer(id_buffer)
 			logger.debug("libmagic identified %s as: %s", self, self._mime_type)
 
+			# This is a hacky way to detect mail messages. Sometimes, when the amount of other text data exceeds the
+			# amount of "mail-like" data in a file (like a mail message with lots of HTML), libmagic fails to detect
+			# the file as a mail message.
 			if self._mime_type in ('text/plain', 'text/html'):
 				try:
 					msg = email.message_from_string(id_buffer.decode('utf-8'))
 					if len(msg.keys()) and 'From' in msg and 'To' in msg:
 						logger.debug("Identified mail in %s when libmagic could not (said it was %s)", self.filename, self.mime_type)
 						self._mime_type = 'message/rfc822'
-				except Exception as ex:
+				except:
 					pass
 
 	def unpack(self):
