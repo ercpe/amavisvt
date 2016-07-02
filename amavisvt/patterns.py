@@ -26,7 +26,7 @@ def calculate(s, choices):
 		ratios = [fuzz.ratio(chunks[i], other_chunks[i]) for i in range(0, len(chunks))]
 
 		# skip if more than one chunk differs
-		if len(filter(lambda x: x != 100, ratios)) > 1:
+		if len(list(filter(lambda x: x != 100, ratios))) > 1:
 			continue
 
 		return '-'.join([chunks[i] if ratios[i] == 100 else '[RANDOM]'for i in range(0, len(chunks))])
