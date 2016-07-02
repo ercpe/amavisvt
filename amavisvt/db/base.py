@@ -13,7 +13,7 @@ class BaseDatabase(object):
 	def close(self):
 		raise NotImplementedError
 
-	def add_resource(self, resource):
+	def add_resource(self, resource, vtresult):
 		raise NotImplementedError
 
 	def get_filenames(self):
@@ -32,7 +32,7 @@ class NoopDatabase(BaseDatabase):
 	def close(self):
 		pass
 
-	def add_resource(self, resource):
+	def add_resource(self, resource, vtresult):
 		pass
 
 	def get_filenames(self):

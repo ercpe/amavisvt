@@ -10,6 +10,9 @@ logger = logging.getLogger(__name__)
 
 LATEST_SCHEMA_VERSION = 1
 
+# sqlite3.register_adapter(bool, int)
+# sqlite3.register_converter("BOOLEAN", lambda v: bool(int(v)))
+
 MIGRATIONS = (
 	(), # version 0
 	(  # version 1
@@ -19,7 +22,7 @@ MIGRATIONS = (
 	`id`	INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
 	`filename`	TEXT UNIQUE,
 	`pattern`	TEXT,
-	`infected`	INTEGER,
+	`infected`	BOOLEAN,
 	`timestamp`	INTEGER,
 	`sha256`	TEXT
 );""",
@@ -77,16 +80,17 @@ class AmavisVTDatabase(BaseDatabase):
 		self.conn.commit()
 		cursor.close()
 
-	def add_resource(self, resource):
+	def add_resource(self, resource, vtresult=None):
 		insert_sql = 'INSERT INTO filenames (filename, pattern, infected, "timestamp", sha256) VALUES (?, ?, ?, ?, ?)'
 		update_sql = 'UPDATE filenames SET pattern = ?, timestamp = ? WHERE filename=?'
 
 		pattern = patterns.calculate(resource.filename, self.get_filenames())
+		infected = vtresult.infected if vtresult else False
 
 		values = (
 			resource.filename,
 			pattern,
-			False,
+			infected,
 			datetime.datetime.utcnow(),
 			resource.sha256
 		)
@@ -100,6 +104,11 @@ class AmavisVTDatabase(BaseDatabase):
 		finally:
 			self.conn.commit()
 			cursor.close()
+
+		cursor = self.conn.cursor()
+		cursor.execute("UPDATE filenames SET infected=? WHERE sha256=? AND infected=0", (int(infected), resource.sha256))
+		self.conn.commit()
+		cursor.close()
 
 	def get_filenames(self):
 		cursor = self.conn.cursor()

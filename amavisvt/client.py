@@ -338,11 +338,15 @@ class AmavisVT(object):
 					logger.debug("Skipping resource: %s", resource)
 					continue
 
-			self.database.add_resource(start_resource)
-
 			logger.info("Sending %s hashes to Virustotal", len(hashes_for_vt))
 			results.extend(list(self.check_vt(hashes_for_vt)))
 
+			# add the main resource to the database using the VTResponse from upstream (or cache)
+			start_resource_result = [r for _, r in results if r and r.sha256 == start_resource.sha256]
+			start_resource_result = start_resource_result[0] if start_resource_result else None
+			self.database.add_resource(start_resource, start_resource_result)
+
+			# update patterns for entries which have no pattern set yet
 			self.database.update_patterns()
 
 			return results
@@ -390,6 +394,7 @@ class AmavisVT(object):
 								d.get('sha256', None),
 							)][0]
 					vtr = VTResponse(d)
+					vtr.infected = vtr.positives >= self.config.hits_required
 
 					if vtr.response_code:
 						logger.info("Saving in cache: %s", vtr.sha256)
@@ -410,7 +415,9 @@ class AmavisVT(object):
 	def get_from_cache(self, sha256hash):
 		from_cache = self.memcached.get(sha256hash)
 		if from_cache:
-			return VTResponse(from_cache)
+			vtr = VTResponse(from_cache)
+			vtr.infected = vtr.positives >= self.config.hits_required
+			return vtr
 
 	def set_in_cache(self, sha256hash, d, expire=0):
 		logger.debug("Saving key %s in cache. Expires in %s seconds", sha256hash, expire)
