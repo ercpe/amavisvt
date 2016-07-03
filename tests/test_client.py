@@ -140,69 +140,69 @@ class TestClient(object):
 		avt.report_to_vt(DummyResource('file1', 'application/zip'))
 		assert not requests_post.called
 
-	@mock.patch('amavisvt.client.open')
-	@mock.patch('amavisvt.client.requests.post')
-	def test_report_to_vt(self, requests_post, open_patch, avt):
-		open_patch.return_value = DummyFile()
-
-		avt.report_to_vt(DummyResource(__file__, 'application/zip'))
-		requests_post.assert_called_with(
-			'https://www.virustotal.com/vtapi/v2/file/scan',
-			data = {
-				'apikey': 'my-api-key'
-			},
-			files={
-				'file': DummyFile()
-			},
-			timeout=10.0,
-			headers={
-				'User-Agent': 'amavisvt/%s (+https://ercpe.de/projects/amavisvt)' % VERSION
-			},
-		)
-
-	@mock.patch('amavisvt.client.open')
-	@mock.patch('amavisvt.client.requests.post')
-	def test_report_to_vt_fail_silently(self, requests_post, open_patch, avt):
-		open_patch.return_value = DummyFile()
-
-		requests_post.side_effect = Exception
-
-		avt.report_to_vt(DummyResource(__file__, 'application/zip'))
-		requests_post.assert_called_with(
-			'https://www.virustotal.com/vtapi/v2/file/scan',
-			data={
-				'apikey': 'my-api-key'
-			},
-			files={
-				'file': DummyFile()
-			},
-			timeout=10.0,
-			headers={
-				'User-Agent': 'amavisvt/%s (+https://ercpe.de/projects/amavisvt)' % VERSION
-			},
-		)
-
-	@mock.patch('amavisvt.client.open')
-	@mock.patch('amavisvt.client.requests.post')
-	def test_report_to_vt_fail_silently_apilimit_reached(self, requests_post, open_patch, avt):
-		open_patch.return_value = DummyFile()
-
-		response = mock.MagicMock()
-		response.status_code = 204
-
-		requests_post.return_value = response
-
-		avt.report_to_vt(DummyResource(__file__, 'application/zip'))
-		requests_post.assert_called_with(
-			'https://www.virustotal.com/vtapi/v2/file/scan',
-			data={
-				'apikey': 'my-api-key'
-			},
-			files={
-				'file': DummyFile()
-			},
-			timeout=10.0,
-			headers={
-				'User-Agent': 'amavisvt/%s (+https://ercpe.de/projects/amavisvt)' % VERSION
-			},
-		)
+	# @mock.patch('amavisvt.client.open')
+	# @mock.patch('amavisvt.client.requests.post')
+	# def test_report_to_vt(self, requests_post, open_patch, avt):
+	# 	open_patch.return_value = DummyFile()
+	#
+	# 	avt.report_to_vt(DummyResource(__file__, 'application/zip'))
+	# 	requests_post.assert_called_with(
+	# 		'https://www.virustotal.com/vtapi/v2/file/scan',
+	# 		data = {
+	# 			'apikey': 'my-api-key'
+	# 		},
+	# 		files={
+	# 			'file': DummyFile()
+	# 		},
+	# 		timeout=10.0,
+	# 		headers={
+	# 			'User-Agent': 'amavisvt/%s (+https://ercpe.de/projects/amavisvt)' % VERSION
+	# 		},
+	# 	)
+	#
+	# @mock.patch('amavisvt.client.open')
+	# @mock.patch('amavisvt.client.requests.post')
+	# def test_report_to_vt_fail_silently(self, requests_post, open_patch, avt):
+	# 	open_patch.return_value = DummyFile()
+	#
+	# 	requests_post.side_effect = Exception
+	#
+	# 	avt.report_to_vt(DummyResource(__file__, 'application/zip'))
+	# 	requests_post.assert_called_with(
+	# 		'https://www.virustotal.com/vtapi/v2/file/scan',
+	# 		data={
+	# 			'apikey': 'my-api-key'
+	# 		},
+	# 		files={
+	# 			'file': DummyFile()
+	# 		},
+	# 		timeout=10.0,
+	# 		headers={
+	# 			'User-Agent': 'amavisvt/%s (+https://ercpe.de/projects/amavisvt)' % VERSION
+	# 		},
+	# 	)
+	#
+	# @mock.patch('amavisvt.client.open')
+	# @mock.patch('amavisvt.client.requests.post')
+	# def test_report_to_vt_fail_silently_apilimit_reached(self, requests_post, open_patch, avt):
+	# 	open_patch.return_value = DummyFile()
+	#
+	# 	response = mock.MagicMock()
+	# 	response.status_code = 204
+	#
+	# 	requests_post.return_value = response
+	#
+	# 	avt.report_to_vt(DummyResource(__file__, 'application/zip'))
+	# 	requests_post.assert_called_with(
+	# 		'https://www.virustotal.com/vtapi/v2/file/scan',
+	# 		data={
+	# 			'apikey': 'my-api-key'
+	# 		},
+	# 		files={
+	# 			'file': DummyFile()
+	# 		},
+	# 		timeout=10.0,
+	# 		headers={
+	# 			'User-Agent': 'amavisvt/%s (+https://ercpe.de/projects/amavisvt)' % VERSION
+	# 		},
+	# 	)
