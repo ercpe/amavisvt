@@ -1,9 +1,13 @@
 # -*- coding: utf-8 -*-
+import sys
+
 from amavisvt import VERSION
 from amavisvt.client import AmavisVT, Configuration, Resource, VTResponse
 from amavisvt.db.base import NoopDatabase
 import mock
 import pytest
+
+OPEN_PATCH = '__builtin__.open' if sys.version_info < (3,0,0) else 'builtins.open'
 
 class DummyResource(Resource):
 	
@@ -140,7 +144,7 @@ class TestClient(object):
 		avt.report_to_vt(DummyResource('file1', 'application/zip'))
 		assert not requests_post.called
 
-	@mock.patch('__builtin__.open')
+	@mock.patch(OPEN_PATCH)
 	@mock.patch('amavisvt.client.requests.post')
 	def test_report_to_vt(self, requests_post, open_patch, avt):
 		open_patch.return_value = DummyFile()
@@ -160,7 +164,7 @@ class TestClient(object):
 			},
 		)
 
-	@mock.patch('__builtin__.open')
+	@mock.patch(OPEN_PATCH)
 	@mock.patch('amavisvt.client.requests.post')
 	def test_report_to_vt_fail_silently(self, requests_post, open_patch, avt):
 		open_patch.return_value = DummyFile()
@@ -182,7 +186,7 @@ class TestClient(object):
 			},
 		)
 
-	@mock.patch('__builtin__.open')
+	@mock.patch(OPEN_PATCH)
 	@mock.patch('amavisvt.client.requests.post')
 	def test_report_to_vt_fail_silently_apilimit_reached(self, requests_post, open_patch, avt):
 		open_patch.return_value = DummyFile()
