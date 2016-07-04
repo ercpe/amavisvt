@@ -64,7 +64,7 @@ class DummyFile():
 		return other is not None and isinstance(other, DummyFile)
 
 
-class TestClient(object):
+class TestClientBasic(object):
 
 	def test_is_included_by_extension(self):
 		avt = AmavisVT(Configuration())
@@ -109,6 +109,9 @@ class TestClient(object):
 		assert not avt.is_included(DummyResource(mime_type='message/rfc822'))
 		assert not avt.is_included(DummyResource(mime_type='image/png'))
 
+
+class TestClientDatabase(object):
+
 	def test_database_fallback(self):
 		c = Configuration({
 			'database-path': '/dev/null',
@@ -117,6 +120,8 @@ class TestClient(object):
 
 		assert isinstance(avt.database, NoopDatabase)
 
+
+class TestClientCache(object):
 	@mock.patch('amavisvt.client.memcache.Client.set')
 	def test_cache_set(self, memcached_client_set, avt):
 		avt.set_in_cache('sha256', {}, 100)
@@ -138,6 +143,8 @@ class TestClient(object):
 		assert isinstance(result, VTResponse)
 		assert result.infected
 
+
+class TestClientReportToVT(object):
 	@mock.patch('amavisvt.client.requests.post')
 	def test_report_to_vt_pretend(self, requests_post):
 		avt = AmavisVT(Configuration({
@@ -217,6 +224,9 @@ class TestClient(object):
 				'User-Agent': 'amavisvt/%s (+https://ercpe.de/projects/amavisvt)' % VERSION
 			},
 		)
+
+
+class TestClientCheckVT(object):
 
 	@mock.patch('amavisvt.client.requests.post')
 	def test_check_vt_pretend(self, requests_post):
