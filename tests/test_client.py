@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import json
+import os
 import sys
 
 import requests
@@ -368,3 +368,79 @@ class TestClientCheckVT(object):
 		filename, vtresult = result[0]
 		assert filename == 'foo.zip'
 		assert vtresult is None
+
+
+class TestClientRun(object):
+
+	@mock.patch('amavisvt.client.requests.post')
+	@mock.patch('amavisvt.client.memcache.Client.set')
+	@mock.patch('amavisvt.client.Database')
+	def test_run(self, database_mock, memcached_mock, requests_mock, avt):
+		txt = os.path.join(os.path.dirname(__file__), 'samples/textfile.txt')
+		result = avt.run(txt)
+		assert not result
+		assert not avt.clean_paths
+
+	@mock.patch('amavisvt.client.requests.post')
+	@mock.patch('amavisvt.client.memcache.Client.set')
+	@mock.patch('amavisvt.client.memcache.Client.get')
+	@mock.patch('amavisvt.client.Database')
+	def test_run_with_unpack_and_cleanup(self, database_mock, memcached_get_mock, memcached_set_mock, requests_mock, avt):
+		mail = os.path.join(os.path.dirname(__file__), 'samples/mail_with_attachment.eml')
+		result = avt.run(mail)
+		# the zip file in the attachment
+		assert len(result) == 1
+		# the zip file in the attachment and the file inside the attachment
+		assert len(avt.clean_paths) == 2
+		assert not any((os.path.exists(p) for p in avt.clean_paths))
+
+	@mock.patch('amavisvt.client.requests.post')
+	@mock.patch('amavisvt.client.memcache.Client.set')
+	@mock.patch('amavisvt.client.memcache.Client.get')
+	@mock.patch('amavisvt.client.Database')
+	def test_run_cache_get(self, database_mock, memcached_get_mock, memcached_set_mock, requests_mock, avt):
+		memcached_get_mock.return_value = None
+
+		mail = os.path.join(os.path.dirname(__file__), 'samples/mail_with_attachment.eml')
+		result = avt.run(mail)
+
+		assert memcached_get_mock.called
+		assert requests_mock.called
+
+		assert len(result) == 0
+		# the zip file in the attachment and the file inside the attachment
+		assert len(avt.clean_paths) == 2
+		assert not any((os.path.exists(p) for p in avt.clean_paths))
+
+	@mock.patch('amavisvt.client.requests.post')
+	@mock.patch('amavisvt.client.memcache.Client.set')
+	@mock.patch('amavisvt.client.memcache.Client.get')
+	@mock.patch('amavisvt.client.Database')
+	def test_run_cache_get_result(self, database_mock, memcached_get_mock, memcached_set_mock, requests_mock, avt):
+		memcached_get_mock.return_value = {
+			"response_code": 1,
+			"verbose_msg": "Scan finished, scan information embedded in this object",
+			"resource": "99017f6eebbac24f351415dd410d522d",
+			"scan_id": "52d3df0ed60c46f336c131bf2ca454f73bafdc4b04dfa2aea80746f5ba9e6d1c-1273894724",
+			"md5": "e77d94e09fbcf6641c1f848d98963298",
+			"sha1": "acbfc25a642cb7fa574f38a361932d1c2fdc1a9e",
+			"sha256": "93440551540584e48d911586606c319744c8e671c20ee6b12cca4b922127a127",
+			"scan_date": "2010-05-15 03:38:44",
+			"positives": 40,
+			"total": 40,
+			"scans": {
+				"nProtect": {"detected": True, "version": "2010-05-14.01", "result": "Trojan.Generic.3611249", "update": "20100514"},
+			},
+			"permalink": "https://www.virustotal.com/file/52d3df0ed60c46f336c131bf2ca454f73bafdc4b04dfa2aea80746f5ba9e6d1c/analysis/1273894724/"
+		}
+
+		mail = os.path.join(os.path.dirname(__file__), 'samples/mail_with_attachment.eml')
+		result = avt.run(mail)
+
+		assert memcached_get_mock.called
+		assert not requests_mock.called
+
+		assert len(result) == 1
+		# the zip file in the attachment and the file inside the attachment
+		assert len(avt.clean_paths) == 2
+		assert not any((os.path.exists(p) for p in avt.clean_paths))
