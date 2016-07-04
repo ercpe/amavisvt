@@ -22,6 +22,7 @@ class DummyResource(Resource):
 	def examine(self):
 		pass
 
+
 RAW_DUMMY_RESPONSE = {
 	"response_code": 1,
 	"verbose_msg": "Scan finished, scan information embedded in this object",
@@ -169,6 +170,8 @@ class TestClient(object):
 	def test_report_to_vt_fail_silently(self, requests_post, open_patch, avt):
 		open_patch.return_value = DummyFile()
 
+		response = mock.MagicMock()
+		requests_post.return_value = response
 		requests_post.side_effect = Exception
 
 		avt.report_to_vt(DummyResource(__file__, 'application/zip'))
