@@ -29,11 +29,11 @@ class DummyResource(Resource):
 RAW_DUMMY_RESPONSE = {
 	"response_code": 1,
 	"verbose_msg": "Scan finished, scan information embedded in this object",
-	"resource": "99017f6eebbac24f351415dd410d522d",
+	"resource": u"99017f6eebbac24f351415dd410d522d",
 	"scan_id": "52d3df0ed60c46f336c131bf2ca454f73bafdc4b04dfa2aea80746f5ba9e6d1c-1273894724",
-	"md5": "99017f6eebbac24f351415dd410d522d",
-	"sha1": "4d1740485713a2ab3a4f5822a01f645fe8387f92",
-	"sha256": "52d3df0ed60c46f336c131bf2ca454f73bafdc4b04dfa2aea80746f5ba9e6d1c",
+	"md5": u"99017f6eebbac24f351415dd410d522d",
+	"sha1": u"4d1740485713a2ab3a4f5822a01f645fe8387f92",
+	"sha256": u"52d3df0ed60c46f336c131bf2ca454f73bafdc4b04dfa2aea80746f5ba9e6d1c",
 	"scan_date": "2010-05-15 03:38:44",
 	"positives": 40,
 	"total": 40,
@@ -308,6 +308,7 @@ class TestClient(object):
 	def test_check_vt_empty_result(self, requests_post, avt):
 		response = requests.Response()
 		response._content = "[]"
+		response.status_code = 200
 
 		requests_post.return_value = response
 
@@ -319,9 +320,11 @@ class TestClient(object):
 		assert not result
 
 	@mock.patch('amavisvt.client.requests.post')
-	def test_check_vt_single_response(self, requests_post, avt):
-		response = requests.Response()
-		response._content = json.dumps(RAW_DUMMY_RESPONSE)
+	@mock.patch('amavisvt.client.memcache.Client.set')
+	def test_check_vt_single_response(self, memcached_mock, requests_post, avt):
+		response = mock.MagicMock()
+		response.status_code = 200
+		response.json = lambda: RAW_DUMMY_RESPONSE
 
 		requests_post.return_value = response
 
@@ -336,11 +339,14 @@ class TestClient(object):
 
 
 	@mock.patch('amavisvt.client.requests.post')
-	def test_check_vt_response_code_0(self, requests_post, avt):
-		response = requests.Response()
+	@mock.patch('amavisvt.client.memcache.Client.set')
+	def test_check_vt_response_code_0(self, memcached_mock, requests_post, avt):
 		raw = RAW_DUMMY_RESPONSE.copy()
 		raw['response_code'] = 0
-		response._content = json.dumps(raw)
+
+		response = mock.MagicMock()
+		response.status_code = 200
+		response.json = lambda: raw
 
 		requests_post.return_value = response
 
