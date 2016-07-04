@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
+import json
 import sys
+
+import requests
 
 from amavisvt import VERSION
 from amavisvt.client import AmavisVT, Configuration, Resource, VTResponse
@@ -214,3 +217,138 @@ class TestClient(object):
 				'User-Agent': 'amavisvt/%s (+https://ercpe.de/projects/amavisvt)' % VERSION
 			},
 		)
+
+	@mock.patch('amavisvt.client.requests.post')
+	def test_check_vt_pretend(self, requests_post):
+		avt = AmavisVT(Configuration({
+			'database-path': ':memory:',
+			'api-key': 'my-api-key',
+			'pretend': 'true'
+		}, path='/dev/null'))
+
+		result = list(avt.check_vt(None))
+		assert not requests_post.called
+		assert not result
+
+	@mock.patch('amavisvt.client.requests.post')
+	def test_check_vt_no_checksums(self, requests_post):
+		avt = AmavisVT(Configuration({
+			'database-path': ':memory:',
+			'api-key': 'my-api-key',
+		}, path='/dev/null'))
+
+		result = list(avt.check_vt(None))
+		assert not requests_post.called
+		assert not result
+
+		result = list(avt.check_vt([]))
+		assert not requests_post.called
+		assert not result
+
+	@mock.patch('amavisvt.client.requests.post')
+	def test_check_vt_request(self, requests_post, avt):
+		result = list(avt.check_vt([
+			('foo.zip', 'foo'),
+			('bar.zip', 'bar'),
+			('baz.zip', 'baz')]))
+
+		requests_post.assert_called_with(
+			"https://www.virustotal.com/vtapi/v2/file/report",
+			{
+				'apikey': 'my-api-key',
+				'resource': 'foo, bar, baz'
+			},
+			timeout=10.0,
+			headers={
+				'User-Agent': 'amavisvt/%s (+https://ercpe.de/projects/amavisvt)' % VERSION
+			}
+		)
+
+	@mock.patch('amavisvt.client.requests.post')
+	def test_check_vt_request_api_limit_exceeded(self, requests_post, avt):
+		response = requests.Response()
+		response.status_code = 204
+
+		requests_post.return_value = response
+
+		result = list(avt.check_vt([
+			('foo.zip', 'foo'),
+			('bar.zip', 'bar'),
+			('baz.zip', 'baz')]))
+
+		requests_post.assert_called_with(
+			"https://www.virustotal.com/vtapi/v2/file/report",
+			{
+				'apikey': 'my-api-key',
+				'resource': 'foo, bar, baz'
+			},
+			timeout=10.0,
+			headers={
+				'User-Agent': 'amavisvt/%s (+https://ercpe.de/projects/amavisvt)' % VERSION
+			}
+		)
+
+		assert not result
+
+	@mock.patch('amavisvt.client.requests.post')
+	def test_check_vt_request_exception(self, requests_post, avt):
+		response = requests.Response()
+		response.status_code = 403
+
+		requests_post.return_value = response
+
+		result = list(avt.check_vt([
+			('foo.zip', 'foo'),
+			('bar.zip', 'bar'),
+			('baz.zip', 'baz')]))
+
+		assert not result
+
+	@mock.patch('amavisvt.client.requests.post')
+	def test_check_vt_empty_result(self, requests_post, avt):
+		response = requests.Response()
+		response._content = "[]"
+
+		requests_post.return_value = response
+
+		result = list(avt.check_vt([
+			('foo.zip', 'foo'),
+			('bar.zip', 'bar'),
+			('baz.zip', 'baz')]))
+
+		assert not result
+
+	@mock.patch('amavisvt.client.requests.post')
+	def test_check_vt_single_response(self, requests_post, avt):
+		response = requests.Response()
+		response._content = json.dumps(RAW_DUMMY_RESPONSE)
+
+		requests_post.return_value = response
+
+		result = list(avt.check_vt([
+			('foo.zip', '52d3df0ed60c46f336c131bf2ca454f73bafdc4b04dfa2aea80746f5ba9e6d1c'),
+		]))
+
+		assert len(result) == 1
+		filename, vtresult = result[0]
+		assert filename == 'foo.zip'
+		assert isinstance(vtresult, VTResponse)
+
+
+	@mock.patch('amavisvt.client.requests.post')
+	def test_check_vt_response_code_0(self, requests_post, avt):
+		response = requests.Response()
+		raw = RAW_DUMMY_RESPONSE.copy()
+		raw['response_code'] = 0
+		response._content = json.dumps(raw)
+
+		requests_post.return_value = response
+
+		result = list(avt.check_vt([
+			('foo.zip', '52d3df0ed60c46f336c131bf2ca454f73bafdc4b04dfa2aea80746f5ba9e6d1c'),
+		]))
+
+		assert len(result) == 1
+		filename, vtresult = result[0]
+		assert filename == 'foo.zip'
+		assert vtresult is None
