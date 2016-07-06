@@ -14,12 +14,11 @@ import tempfile
 
 import shutil
 
-from amavisvt.db.base import NoopDatabase
-
 logger = logging.getLogger(__name__)
 
 from amavisvt import VERSION
 from amavisvt.db import Database
+from amavisvt.db.base import NoopDatabase
 
 try:
 	from ConfigParser import SafeConfigParser as ConfigParser
