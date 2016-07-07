@@ -435,9 +435,6 @@ class AmavisVT(object):
 					vtresult = [r for _, r in vt_results if r and r.sha256 == sha256]
 					vtresult = vtresult[0] if vtresult else None
 
-					if vtresult and vtresult.infected:
-						continue
-
 					# add the resource to the database
 					self.database.add_resource(resource, vtresult)
 
