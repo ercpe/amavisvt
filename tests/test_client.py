@@ -477,3 +477,85 @@ class TestClientRun(object):
 		assert os.path.exists(os.path.join(tmpdir.strpath, 'mail_with_attachment.eml'))
 		assert os.path.exists(os.path.join(tmpdir.strpath, 'textfile.zip'))
 		assert len(os.listdir(tmpdir.strpath)) == 2
+
+	@mock.patch('amavisvt.client.requests.post')
+	@mock.patch('amavisvt.client.memcache.Client.set')
+	@mock.patch('amavisvt.client.memcache.Client.get')
+	@mock.patch('amavisvt.client.Database')
+	def test_run_with_filename_pattern_detection_no_match(self, database_mock, memcached_get_mock, memcached_set_mock, requests_mock):
+		memcached_get_mock.return_value = None
+		database_mock.filename_pattern_match = mock.MagicMock()
+		database_mock.filename_pattern_match.return_value = False
+
+		avt = AmavisVT(Configuration({
+			'database-path': ':memory:',
+			'api-key': 'my-api-key',
+			'filename-pattern-detection': 'true'
+		}, path='/dev/null'))
+		avt.database = database_mock
+
+		mail = os.path.join(os.path.dirname(__file__), 'samples/mail_with_attachment.eml')
+		result = avt.run(mail)
+		database_mock.filename_pattern_match.assert_called_with('textfile.zip')
+		assert not result
+		assert not any([os.path.exists(p) for p in avt.clean_paths])
+
+	@mock.patch('amavisvt.client.requests.post')
+	@mock.patch('amavisvt.client.memcache.Client.set')
+	@mock.patch('amavisvt.client.memcache.Client.get')
+	@mock.patch('amavisvt.client.Database')
+	def test_run_with_filename_pattern_detection_match(self, database_mock, memcached_get_mock, memcached_set_mock,
+														  requests_mock):
+		memcached_get_mock.return_value = None
+		database_mock.filename_pattern_match = mock.MagicMock()
+		database_mock.filename_pattern_match.return_value = True
+
+		avt = AmavisVT(Configuration({
+			'database-path': ':memory:',
+			'api-key': 'my-api-key',
+			'filename-pattern-detection': 'true'
+		}, path='/dev/null'))
+		avt.database = database_mock
+
+		mail = os.path.join(os.path.dirname(__file__), 'samples/mail_with_attachment.eml')
+		result = avt.run(mail)
+
+		database_mock.filename_pattern_match.assert_called_with('textfile.zip')
+		assert len(result) == 1
+		resource, response = result[0]
+		assert resource.filename == 'textfile.zip'
+		assert response.infected
+
+		assert not any([os.path.exists(p) for p in avt.clean_paths])
+
+	@mock.patch('amavisvt.client.requests.post')
+	@mock.patch('amavisvt.client.memcache.Client.set')
+	@mock.patch('amavisvt.client.memcache.Client.get')
+	@mock.patch('amavisvt.client.Database')
+	def test_run_with_filename_pattern_detection_match_with_autoreport(self, database_mock, memcached_get_mock, memcached_set_mock,
+													   requests_mock):
+		memcached_get_mock.return_value = None
+		database_mock.filename_pattern_match = mock.MagicMock()
+		database_mock.filename_pattern_match.return_value = True
+
+		avt = AmavisVT(Configuration({
+			'database-path': ':memory:',
+			'api-key': 'my-api-key',
+			'filename-pattern-detection': 'true',
+			'auto-report': 'true'
+		}, path='/dev/null'))
+		avt.database = database_mock
+
+		mail = os.path.join(os.path.dirname(__file__), 'samples/mail_with_attachment.eml')
+		result = avt.run(mail)
+		database_mock.filename_pattern_match.assert_called_with('textfile.zip')
+
+		assert requests_mock.called
+		assert requests_mock.call_count == 2  # once for scan report and once for submitting
+
+		assert len(result) == 1
+		resource, response = result[0]
+		assert resource.filename == 'textfile.zip'
+		assert response.infected
+
+		assert not any([os.path.exists(p) for p in avt.clean_paths])
