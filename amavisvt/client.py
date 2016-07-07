@@ -177,6 +177,7 @@ class Resource(object):
 		self.path = path
 		self._filename = kwargs.get('filename', None)
 		self._no_unpack = kwargs.get('no_unpack', False)
+		self.cleanup = kwargs.get('cleanup', True)
 		self._md5 = None
 		self._sha1 = None
 		self._sha256 = None
@@ -381,15 +382,35 @@ class AmavisVT(object):
 
 		self.clean_paths = []
 
-	def run(self, file):
+	def run(self, file_or_directory):
+		resources = []
+
+		if os.path.isfile(file_or_directory):
+			resources.append(Resource(file_or_directory, cleanup=False))
+		elif os.path.isdir(file_or_directory):
+			for root, dirs, files in os.walk(file_or_directory):
+				for f in files:
+					p = os.path.join(root, f)
+					resources.append(Resource(p, cleanup=False))
+
+		return self.process(resources)
+
+	def process(self, resources):
 		hashes_for_vt = []
 		results = []
 
 		try:
-			start_resource = Resource(file)
+			def _iter_resources():
+				for r in resources:
+					yield r
+					for x in r:
+						yield x
 
-			for resource in [start_resource] + list(start_resource):
-				if resource.path != start_resource.path:
+			all_resources = list(_iter_resources())
+			logger.info("Processing %s resources: %s", len(all_resources), ', '.join([r.path for r in all_resources]))
+
+			for resource in all_resources:
+				if resource.cleanup:
 					self.clean_paths.append(resource.path)
 
 				if self.is_included(resource):
@@ -427,10 +448,11 @@ class AmavisVT(object):
 
 			results.extend(vt_results)
 
-			# add the main resource to the database using the VTResponse from upstream (or cache)
-			start_resource_result = [r for _, r in results if r and r.sha256 == start_resource.sha256]
-			start_resource_result = start_resource_result[0] if start_resource_result else None
-			self.database.add_resource(start_resource, start_resource_result)
+			for resource in resources:
+				# add the main resources to the database using the VTResponse from upstream (or cache) if available
+				start_resource_result = [r for _, r in results if r and r.sha256 == resource.sha256]
+				start_resource_result = start_resource_result[0] if start_resource_result else None
+				self.database.add_resource(resource, start_resource_result)
 
 			# update patterns for entries which have no pattern set yet
 			self.database.update_patterns()

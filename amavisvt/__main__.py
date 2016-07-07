@@ -21,7 +21,7 @@ def main(args):
 
 	detected = False
 
-	for resource, scan_result in AmavisVT(config).run(args.file):
+	for resource, scan_result in AmavisVT(config).run(args.file_or_directory):
 		if scan_result is None:
 			print("%s: Not scanned by virustotal" % resource)
 		elif isinstance(scan_result, Exception):
@@ -38,7 +38,7 @@ def main(args):
 
 if __name__ == "__main__":
 	parser = ArgumentParser()
-	parser.add_argument('file')
+	parser.add_argument('file_or_directory')
 	parser.add_argument('--apikey')
 	parser.add_argument('-v', '--verbose', action='count', help='Increase verbosity', default=2)
 	parser.add_argument('-d', '--debug', action='store_true', default=False, help='Send verbose log messages to stdout too')

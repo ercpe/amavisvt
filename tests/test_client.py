@@ -3,6 +3,7 @@ import os
 import sys
 
 import requests
+import shutil
 
 from amavisvt import VERSION
 from amavisvt.client import AmavisVT, Configuration, Resource, VTResponse
@@ -444,3 +445,35 @@ class TestClientRun(object):
 		# the zip file in the attachment and the file inside the attachment
 		assert len(avt.clean_paths) == 2
 		assert not any((os.path.exists(p) for p in avt.clean_paths))
+
+	@mock.patch('amavisvt.client.requests.post')
+	@mock.patch('amavisvt.client.memcache.Client.set')
+	@mock.patch('amavisvt.client.memcache.Client.get')
+	@mock.patch('amavisvt.client.Database')
+	def test_run_with_directory(self, database_mock, memcached_get_mock, memcached_set_mock, requests_mock, tmpdir, avt):
+		memcached_get_mock.return_value = None
+
+		mail = os.path.join(os.path.dirname(__file__), 'samples/mail_with_attachment.eml')
+		zip = os.path.join(os.path.dirname(__file__), 'samples/textfile.zip')
+		shutil.copy(mail, os.path.join(tmpdir.strpath, 'mail_with_attachment.eml'))
+		shutil.copy(zip, os.path.join(tmpdir.strpath, 'textfile.zip'))
+
+		avt.run(tmpdir.strpath)
+
+		assert memcached_get_mock.called
+		requests_mock.assert_called_with(
+			"https://www.virustotal.com/vtapi/v2/file/report",
+			{
+				'apikey': 'my-api-key',
+				'resource': '93440551540584e48d911586606c319744c8e671c20ee6b12cca4b922127a127, 93440551540584e48d911586606c319744c8e671c20ee6b12cca4b922127a127'
+			},
+			timeout=10.0,
+			headers={
+				'User-Agent': 'amavisvt/%s (+https://ercpe.de/projects/amavisvt)' % VERSION
+			}
+		)
+
+		# these resources should not be cleaned up
+		assert os.path.exists(os.path.join(tmpdir.strpath, 'mail_with_attachment.eml'))
+		assert os.path.exists(os.path.join(tmpdir.strpath, 'textfile.zip'))
+		assert len(os.listdir(tmpdir.strpath)) == 2
