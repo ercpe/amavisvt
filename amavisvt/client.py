@@ -438,6 +438,9 @@ class AmavisVT(object):
 					if vtresult and vtresult.infected:
 						continue
 
+					# add the resource to the database
+					self.database.add_resource(resource, vtresult)
+
 					if self.database.filename_pattern_match(resource.filename):
 						logger.info("Flagging attachment %s as INFECTED (identified via filename pattern)", resource.filename)
 
@@ -447,12 +450,6 @@ class AmavisVT(object):
 							self.report_to_vt(resource)
 
 			results.extend(vt_results)
-
-			for resource in resources:
-				# add the main resources to the database using the VTResponse from upstream (or cache) if available
-				start_resource_result = [r for _, r in results if r and r.sha256 == resource.sha256]
-				start_resource_result = start_resource_result[0] if start_resource_result else None
-				self.database.add_resource(resource, start_resource_result)
 
 			# update patterns for entries which have no pattern set yet
 			self.database.update_patterns()
