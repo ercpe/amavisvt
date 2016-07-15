@@ -3,7 +3,7 @@
 Before you think about integrating it into your mailserver, please have in mind that the Virustotal Public API has a very low request limit which isn't enough for most mail servers to provide good results.<br />
 `amavisvt` uses memcached to reduce the number of calls to the API. While it's possible to run amavisvt without memached, it's strongly advised to do so.
 
-`amavisvt` uses the SHA256 hash of mimeparts to fetch file scan reports from Virustotal. `amavisvt` **does not** send any content to virustotal. To reduce the number of requests to VT even further, `amavisvt` only asks for reports for parts whose mime type (identified by libmagic) starts with `application/`, `image/` or are typical scripts (perl, python, shell).
+`amavisvt` uses the SHA256 hash of mimeparts to fetch file scan reports from Virustotal. `amavisvt` **does not** send any content to virustotal unless you have the filename pattern detection feature enabled (see amavisvt_example.cfg for details). To reduce the number of requests to VT even further, `amavisvt` only asks for reports for parts whose mime type (identified by libmagic) starts with `application/`, `image/` or are typical scripts (perl, python, shell).
 
 In future versions, `amavisvt` may integrate configurable filter for the mime types and/or file extensions.
 
