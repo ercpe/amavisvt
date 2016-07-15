@@ -525,7 +525,7 @@ class AmavisVT(object):
 		return any((f(resource) for f in [
 					lambda r: r.mime_type.startswith('application/'),
 					lambda r: r.mime_type in ('text/x-shellscript', 'text/x-perl', 'text/x-ruby', 'text/x-python'),
-					lambda r: re.search(r"\.(exe|com|zip|tar\.[\w\d]+|doc\w?|xls\w?|ppt\w?|pdf|js|bat|cmd|rtf|ttf|html?)$", r.filename, re.IGNORECASE)
+					lambda r: re.search(r"\.(exe|com|zip|tar\.[\w\d]+|doc\w?|xls\w?|ppt\w?|pdf|js|bat|cmd|rtf|ttf|html?|vbs|wsf)$", r.filename, re.IGNORECASE)
 		]))
 
 	def check_vt(self, checksums):
