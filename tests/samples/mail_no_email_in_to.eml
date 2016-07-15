@@ -1,0 +1,28 @@
+To: undisclosed-recipients:;
+From: bob@example.com
+Subject: Mail with attachment
+Message-ID: <ffca4c38-244b-7c0b-6c96-71645df67e3f@j-schmitz.net>
+Date: Wed, 29 Jun 2016 08:15:53 +0200
+MIME-Version: 1.0
+Content-Type: multipart/mixed;
+ boundary="------------96E4A3FAF6C4FC027A2A5542"
+
+This is a multi-part message in MIME format.
+--------------96E4A3FAF6C4FC027A2A5542
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+Mail with attachment
+
+--------------96E4A3FAF6C4FC027A2A5542
+Content-Type: application/zip;
+ name="textfile.zip"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment;
+ filename="textfile.zip"
+
+UEsDBAoAAAAAAJE23EjbrpF9BwAAAAcAAAAKABwAZm9vYmFyLnR4dFVUCQADkQJyV5ECcld1
+eAsAAQToAwAABOgDAABGb29iYXIKUEsBAh4DCgAAAAAAkTbcSNuukX0HAAAABwAAAAoAGAAA
+AAAAAQAAAKSBAAAAAGZvb2Jhci50eHRVVAUAA5ECcld1eAsAAQToAwAABOgDAABQSwUGAAAA
+AAEAAQBQAAAASwAAAAAA
+--------------96E4A3FAF6C4FC027A2A5542--

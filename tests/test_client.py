@@ -496,7 +496,23 @@ class TestClientRun(object):
 
 		mail = os.path.join(os.path.dirname(__file__), 'samples/mail_with_attachment.eml')
 		result = avt.run(mail)
-		database_mock.filename_pattern_match.assert_called_with('textfile.zip')
+
+		assert database_mock.filename_pattern_match.called
+		call_result = database_mock.filename_pattern_match.call_args
+		assert len(call_result) == 2 # resource and localpart
+		call_args, call_kwargs = call_result
+
+		# assert that one arg and one kwarg are passed
+		assert len(call_args) == 1
+		assert len(call_kwargs) == 1
+
+		# the first arg must be our resource
+		assert isinstance(call_args[0], Resource)
+		assert call_args[0].filename == 'textfile.zip'
+
+		# the localpart kwarg should be 'alice'
+		assert call_kwargs['localpart'] == 'alice'
+
 		assert not result
 		assert not any([os.path.exists(p) for p in avt.clean_paths])
 
@@ -520,7 +536,23 @@ class TestClientRun(object):
 		mail = os.path.join(os.path.dirname(__file__), 'samples/mail_with_attachment.eml')
 		result = avt.run(mail)
 
-		database_mock.filename_pattern_match.assert_called_with('textfile.zip')
+		assert database_mock.filename_pattern_match.called
+		call_result = database_mock.filename_pattern_match.call_args
+		assert len(call_result) == 2 # resource and localpart
+		call_args, call_kwargs = call_result
+
+		# assert that one arg and one kwarg are passed
+		assert len(call_args) == 1
+		assert len(call_kwargs) == 1
+
+		# the first arg must be our resource
+		assert isinstance(call_args[0], Resource)
+		assert call_args[0].filename == 'textfile.zip'
+
+		# the localpart kwarg should be 'alice'
+		assert call_kwargs['localpart'] == 'alice'
+
+		#database_mock.filename_pattern_match.assert_called_with('textfile.zip')
 		assert len(result) == 1
 		resource, response = result[0]
 		assert resource.filename == 'textfile.zip'
@@ -548,7 +580,22 @@ class TestClientRun(object):
 
 		mail = os.path.join(os.path.dirname(__file__), 'samples/mail_with_attachment.eml')
 		result = avt.run(mail)
-		database_mock.filename_pattern_match.assert_called_with('textfile.zip')
+
+		assert database_mock.filename_pattern_match.called
+		call_result = database_mock.filename_pattern_match.call_args
+		assert len(call_result) == 2 # resource and localpart
+		call_args, call_kwargs = call_result
+
+		# assert that one arg and one kwarg are passed
+		assert len(call_args) == 1
+		assert len(call_kwargs) == 1
+
+		# the first arg must be our resource
+		assert isinstance(call_args[0], Resource)
+		assert call_args[0].filename == 'textfile.zip'
+
+		# the localpart kwarg should be 'alice'
+		assert call_kwargs['localpart'] == 'alice'
 
 		assert requests_mock.called
 		assert requests_mock.call_count == 2  # once for scan report and once for submitting

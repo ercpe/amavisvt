@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 import base64
-import email
 import os
 import zipfile
+import email
+from email.utils import parseaddr
 
 import magic
 import re
@@ -13,6 +14,8 @@ import memcache
 import tempfile
 
 import shutil
+
+MAIL_MIME_TYPE = 'message/rfc822'
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +174,68 @@ class FilenameResponse(VTResponse):
 		self.infected = True
 
 
+class ResourceSet(object):
+	def __init__(self, resources):
+		self.resources = resources or []
+		self._to_addresses = None
+
+	def __len__(self):
+		return len(self.resources)
+
+	@property
+	def to_addresses(self):
+		if self._to_addresses is None:
+			self.find_recipients()
+		return self._to_addresses
+
+	@property
+	def to_localpart(self):
+		if not self.to_addresses:
+			return None
+
+		to = self.to_addresses[0]
+		if '@' in to:
+			return to.split('@')[0]
+
+	@property
+	def to_domain(self):
+		if not self.to_addresses:
+			return None
+
+		to = self.to_addresses[0]
+		if '@' in to:
+			return to.split('@')[1]
+
+	def find_recipients(self):
+		addresses = []
+
+		for r in self.resources:
+			if r.mime_type == MAIL_MIME_TYPE:
+				addresses.extend(self.extract_addresses(r))
+
+		self._to_addresses = list(set(addresses))
+
+	def extract_addresses(self, resource):
+		l = []
+
+		try:
+			with open(resource.path) as f:
+				msg = email.message_from_file(f)
+				recipient = msg.get('To', '')
+				if recipient:
+					logger.info("TO header: '%s'", recipient)
+					real_name, email_address = parseaddr(recipient)
+					if email_address:
+						l.append(email_address)
+		except:
+			logger.exception("Could not extract 'To' header from resource %s", resource)
+
+		return l
+
+	def __iter__(self):
+		return iter(self.resources)
+
+
 class Resource(object):
 
 	def __init__(self, path, **kwargs):
@@ -216,7 +281,7 @@ class Resource(object):
 
 	@property
 	def can_unpack(self):
-		return self.mime_type in ('application/zip', 'message/rfc822', ) and not self._no_unpack
+		return self.mime_type in ('application/zip', MAIL_MIME_TYPE,) and not self._no_unpack
 
 	@property
 	def filename(self):
@@ -272,7 +337,7 @@ class Resource(object):
 					msg = email.message_from_string(id_buffer.decode('utf-8'))
 					if len(msg.keys()) and 'From' in msg and 'To' in msg:
 						logger.debug("Identified mail in %s when libmagic could not (said it was %s)", self.filename, self.mime_type)
-						self._mime_type = 'message/rfc822'
+						self._mime_type = MAIL_MIME_TYPE
 				except:
 					pass
 
@@ -281,7 +346,7 @@ class Resource(object):
 
 		if self.mime_type == 'application/zip':
 			unpack_func = self.unpack_zip
-		elif self.mime_type == 'message/rfc822':
+		elif self.mime_type == MAIL_MIME_TYPE:
 			unpack_func = self.unpack_mail
 
 		try:
@@ -393,15 +458,15 @@ class AmavisVT(object):
 					p = os.path.join(root, f)
 					resources.append(Resource(p, cleanup=False))
 
-		return self.process(resources)
+		return self.process(ResourceSet(resources))
 
-	def process(self, resources):
+	def process(self, resource_set):
 		hashes_for_vt = []
 		results = []
 
 		try:
 			def _iter_resources():
-				for r in resources:
+				for r in resource_set:
 					yield r
 					for x in r:
 						yield x
@@ -436,9 +501,9 @@ class AmavisVT(object):
 					vtresult = vtresult[0] if vtresult else None
 
 					# add the resource to the database
-					self.database.add_resource(resource, vtresult)
+					self.database.add_resource(resource, vtresult, resource_set.to_localpart, resource_set.to_domain)
 
-					if self.database.filename_pattern_match(resource.filename):
+					if self.database.filename_pattern_match(resource, localpart=resource_set.to_localpart):
 						logger.info("Flagging attachment %s as INFECTED (identified via filename pattern)", resource.filename)
 
 						results.append((resource, FilenameResponse()))

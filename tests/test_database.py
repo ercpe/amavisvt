@@ -87,10 +87,10 @@ class TestAmavisVTDatabase(object):
 			'database-path': str(tmpdir + '/database.sqlite3')
 		}, path='/dev/null'))
 		db.close()
-		assert db.schema_version == 1
+		assert db.schema_version == 2
 
 	def test_schema_migration(self, testdb):
-		assert testdb.schema_version == 1
+		assert testdb.schema_version == 2
 		testdb.conn.commit()
 
 		cursor = testdb.conn.cursor()
@@ -98,20 +98,20 @@ class TestAmavisVTDatabase(object):
 		testdb.conn.close()
 
 	def test_schema_migration_already_migrated(self, testdb):
-		assert testdb.schema_version == 1
+		assert testdb.schema_version == 2
 		testdb.conn.commit()
 
 		cursor = testdb.conn.cursor()
 		assert cursor.execute('SELECT version FROM schema_version').fetchone()[0] == testdb.schema_version
 
 		testdb.check_schema()
-		assert testdb.schema_version == 1
+		assert testdb.schema_version == 2
 		testdb.conn.commit()
 
 		testdb.conn.close()
 
 	def test_get_filenames(self, testdb):
-		assert testdb.schema_version == 1
+		assert testdb.schema_version == 2
 		testdb.conn.commit()
 
 		cursor = testdb.conn.cursor()
@@ -122,8 +122,27 @@ class TestAmavisVTDatabase(object):
 
 		assert sorted(testdb.get_filenames()) == ['bar', 'baz', 'foo']
 
+	def test_get_filenames_localpart(self, testdb):
+		assert testdb.schema_version == 2
+		testdb.conn.commit()
+
+		cursor = testdb.conn.cursor()
+		cursor.execute(
+			"INSERT INTO filenames (filename, pattern, infected, timestamp, sha256, localpart) VALUES ('foo', 'foo', 0, 0, 'foo', 'alice')")
+		cursor.execute(
+			"INSERT INTO filenames (filename, pattern, infected, timestamp, sha256, localpart) VALUES ('bar', 'bar', 0, 0, 'bar', 'bob')")
+		cursor.execute(
+			"INSERT INTO filenames (filename, pattern, infected, timestamp, sha256) VALUES ('baz', 'baz', 0, 0, 'baz')")
+		testdb.conn.commit()
+
+		assert sorted(testdb.get_filename_localparts()) == [
+			('bar', 'bob'),
+			('baz', None),
+			('foo', 'alice')
+		]
+
 	def test_clean(self, testdb):
-		assert testdb.schema_version == 1
+		assert testdb.schema_version == 2
 		testdb.conn.commit()
 
 		cursor = testdb.conn.cursor()
@@ -140,10 +159,9 @@ class TestAmavisVTDatabase(object):
 
 	def test_filename_pattern_match_no_pattern(self, testdb):
 		assert not testdb.filename_pattern_match(None)
-		assert not testdb.filename_pattern_match("")
-		assert not testdb.filename_pattern_match("a.zip")
-		assert not testdb.filename_pattern_match("abc-def.zip")
-		assert not testdb.filename_pattern_match("foo-bar-baz.zip")
+		assert not testdb.filename_pattern_match(DummyResource("a.zip"))
+		assert not testdb.filename_pattern_match(DummyResource("abc-def.zip"))
+		assert not testdb.filename_pattern_match(DummyResource("foo-bar-baz.zip"))
 
 	def test_filename_pattern_match_no_infected_pattern(self, testdb):
 		cursor = testdb.conn.cursor()
@@ -151,7 +169,7 @@ class TestAmavisVTDatabase(object):
 			cursor.execute("INSERT INTO filenames (filename, pattern, infected, timestamp, sha256) VALUES (?, 'foo-bar-[RANDOM]-zip', 0, 0, ?)", (filename, filename))
 		testdb.conn.commit()
 
-		assert not testdb.filename_pattern_match("foo-bar-baz.zip")
+		assert not testdb.filename_pattern_match(DummyResource("foo-bar-baz.zip"))
 
 	def test_filename_pattern_match_not_enough_patterns(self, testdb):
 		cursor = testdb.conn.cursor()
@@ -161,7 +179,7 @@ class TestAmavisVTDatabase(object):
 				(filename, filename))
 		testdb.conn.commit()
 
-		assert not testdb.filename_pattern_match("foo-bar-baz.zip")
+		assert not testdb.filename_pattern_match(DummyResource("foo-bar-baz.zip"))
 
 	def test_filename_pattern_match_not_enough_infected(self, testdb):
 		cursor = testdb.conn.cursor()
@@ -172,7 +190,7 @@ class TestAmavisVTDatabase(object):
 				"INSERT INTO filenames (filename, pattern, infected, timestamp, sha256) VALUES (?, 'foo-bar-[RANDOM]-zip', ?, 0, ?)",
 				(filename, infected, filename))
 		testdb.conn.commit()
-		assert not testdb.filename_pattern_match("foo-bar-baz.zip")
+		assert not testdb.filename_pattern_match(DummyResource("foo-bar-baz.zip"))
 
 	def test_filename_pattern_match(self, testdb):
 		cursor = testdb.conn.cursor()
@@ -182,7 +200,7 @@ class TestAmavisVTDatabase(object):
 				"INSERT INTO filenames (filename, pattern, infected, timestamp, sha256) VALUES (?, 'foo-bar-[RANDOM]-zip', 1, 0, ?)",
 				(filename, filename))
 		testdb.conn.commit()
-		assert testdb.filename_pattern_match("foo-bar-baz.zip")
+		assert testdb.filename_pattern_match(DummyResource("foo-bar-baz.zip"))
 
 	def test_update_patterns_nothing_to_update(self, testdb):
 		cursor = testdb.conn.cursor()

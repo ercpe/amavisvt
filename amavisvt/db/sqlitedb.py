@@ -9,7 +9,7 @@ from amavisvt.db.base import BaseDatabase
 
 logger = logging.getLogger(__name__)
 
-LATEST_SCHEMA_VERSION = 1
+LATEST_SCHEMA_VERSION = 2
 
 MIGRATIONS = (
 	(), # version 0
@@ -25,6 +25,10 @@ MIGRATIONS = (
 	`sha256`	TEXT
 );""",
 	),
+	(  # version 2
+		"ALTER TABLE filenames ADD COLUMN localpart TEXT",
+		"ALTER TABLE filenames ADD COLUMN domain TEXT",
+	),
 )
 
 class AmavisVTDatabase(BaseDatabase):
@@ -36,6 +40,7 @@ class AmavisVTDatabase(BaseDatabase):
 	def connect(self):
 		logger.debug("Connecting to database %s", self.config.database_path)
 		self.conn = sqlite3.connect(self.config.database_path)
+		self.conn.text_factory = str
 		self.check_schema()
 
 	def check_schema(self):
@@ -85,11 +90,12 @@ class AmavisVTDatabase(BaseDatabase):
 		cursor.close()
 		self.schema_version = version
 
-	def add_resource(self, resource, vtresult=None):
-		insert_sql = 'INSERT INTO filenames (filename, pattern, infected, "timestamp", sha256) VALUES (?, ?, ?, ?, ?)'
+	def add_resource(self, resource, vtresult=None, localpart=None, domain=None):
+		logger.debug("Adding resource %s with result %s and to (%s, %s) to database", resource, vtresult, localpart, domain)
+		insert_sql = 'INSERT INTO filenames (filename, pattern, infected, "timestamp", sha256, localpart, domain) VALUES (?, ?, ?, ?, ?, ?, ?)'
 		update_sql = 'UPDATE filenames SET pattern = ?, timestamp = ? WHERE filename=?'
 
-		pattern = patterns.calculate(resource.filename, self.get_filenames())
+		pattern = patterns.calculate(resource.filename, self.get_filename_localparts(), localpart=localpart)
 		infected = vtresult.infected if vtresult else False
 
 		values = (
@@ -97,7 +103,9 @@ class AmavisVTDatabase(BaseDatabase):
 			pattern,
 			infected,
 			datetime.datetime.utcnow(),
-			resource.sha256
+			resource.sha256,
+			localpart,
+			domain
 		)
 
 		cursor = None
@@ -123,9 +131,17 @@ class AmavisVTDatabase(BaseDatabase):
 		cursor.close()
 		return l
 
+	def get_filename_localparts(self):
+		cursor = self.conn.cursor()
+		cursor.execute('SELECT DISTINCT filename, localpart FROM filenames')
+		l = [tuple(x) for x in cursor.fetchall()]
+		self.conn.commit()
+		cursor.close()
+		return l
+
 	def update_patterns(self):
 		logger.info("Updating patterns")
-		sql = 'SELECT id, filename FROM filenames WHERE pattern IS NULL'
+		sql = 'SELECT id, filename, localpart FROM filenames WHERE pattern IS NULL'
 
 		cursor = self.conn.cursor()
 		cursor.execute(sql)
@@ -134,10 +150,10 @@ class AmavisVTDatabase(BaseDatabase):
 		cursor.close()
 
 		update_sql = 'UPDATE filenames SET pattern=? WHERE id=?'
-		other_filenames = self.get_filenames()
+		other_filename_localparts = self.get_filename_localparts()
 
-		for id, filename in result:
-			pattern = patterns.calculate(filename, other_filenames)
+		for id, filename, localpart in result:
+			pattern = patterns.calculate(filename, other_filename_localparts, localpart=localpart)
 			if pattern:
 				logger.debug("Updating pattern for %s to %s", filename, pattern)
 				cursor = self.conn.cursor()
@@ -157,11 +173,14 @@ class AmavisVTDatabase(BaseDatabase):
 		self.conn.commit()
 		cursor.close()
 
-	def filename_pattern_match(self, filename):
-		pattern = patterns.calculate(filename, self.get_filenames())
+	def filename_pattern_match(self, resource, localpart=None):
+		if not resource:
+			return False
+
+		pattern = patterns.calculate(resource.filename, self.get_filename_localparts(), localpart=localpart)
 
 		if not pattern:
-			logger.debug("No pattern for filename '%s'.", filename)
+			logger.debug("No pattern for filename '%s'.", resource)
 			return
 
 		logger.debug("Checking database for pattern: %s", pattern)

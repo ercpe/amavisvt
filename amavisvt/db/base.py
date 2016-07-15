@@ -13,10 +13,13 @@ class BaseDatabase(object):  # pragma: no cover
 	def close(self):
 		raise NotImplementedError
 
-	def add_resource(self, resource, vtresult):
+	def add_resource(self, resource, vtresult=None, localpart=None, domain=None):
 		raise NotImplementedError
 
 	def get_filenames(self):
+		raise NotImplementedError
+
+	def get_filename_localparts(self):
 		raise NotImplementedError
 
 	def update_patterns(self):
@@ -25,7 +28,7 @@ class BaseDatabase(object):  # pragma: no cover
 	def clean(self):
 		raise NotImplementedError
 
-	def filename_pattern_match(self, filename):
+	def filename_pattern_match(self, resource, localpart=None):
 		raise NotImplementedError
 
 
@@ -36,10 +39,13 @@ class NoopDatabase(BaseDatabase):  # pragma: no cover
 	def close(self):
 		pass
 
-	def add_resource(self, resource, vtresult):
+	def add_resource(self, resource, vtresult=None, localpart=None, domain=None):
 		pass
 
 	def get_filenames(self):
+		pass
+
+	def get_filename_localparts(self):
 		pass
 
 	def update_patterns(self):
@@ -48,5 +54,5 @@ class NoopDatabase(BaseDatabase):  # pragma: no cover
 	def clean(self):
 		pass
 
-	def filename_pattern_match(self, filename):
+	def filename_pattern_match(self, resource, localpart=None):
 		pass
