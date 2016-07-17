@@ -70,31 +70,12 @@ class TestClientBasic(object):
 	def test_is_included_by_extension(self):
 		avt = AmavisVT(Configuration())
 
-		assert avt.is_included(DummyResource('/tmp/foo.exe'))
-		assert avt.is_included(DummyResource('/tmp/foo.com'))
-		assert avt.is_included(DummyResource('/tmp/foo.bat'))
-		assert avt.is_included(DummyResource('/tmp/foo.cmd'))
-		assert avt.is_included(DummyResource('/tmp/foo.tar.gz'))
-		assert avt.is_included(DummyResource('/tmp/foo.zip'))
-		assert avt.is_included(DummyResource('/tmp/foo.tar.bz2'))
-		assert avt.is_included(DummyResource('/tmp/foo.tar.7z'))
-		assert avt.is_included(DummyResource('/tmp/foo.doc'))
-		assert avt.is_included(DummyResource('/tmp/foo.docx'))
-		assert avt.is_included(DummyResource('/tmp/foo.docm'))
-		assert avt.is_included(DummyResource('/tmp/foo.xls'))
-		assert avt.is_included(DummyResource('/tmp/foo.xlsa'))
-		assert avt.is_included(DummyResource('/tmp/foo.xlsx'))
-		assert avt.is_included(DummyResource('/tmp/foo.xlsm'))
-		assert avt.is_included(DummyResource('/tmp/foo.ppt'))
-		assert avt.is_included(DummyResource('/tmp/foo.ppta'))
-		assert avt.is_included(DummyResource('/tmp/foo.pptx'))
-		assert avt.is_included(DummyResource('/tmp/foo.pptm'))
-		assert avt.is_included(DummyResource('/tmp/foo.pdf'))
-		assert avt.is_included(DummyResource('/tmp/foo.js'))
-		assert avt.is_included(DummyResource('/tmp/foo.rtf'))
-		assert avt.is_included(DummyResource('/tmp/foo.ttf'))
-		assert avt.is_included(DummyResource('/tmp/foo.htm'))
-		assert avt.is_included(DummyResource('/tmp/foo.html'))
+		for ext in [
+			'.exe', '.com', '.bat', '.cmd', '.tar.gz', '.zip', '.tar.bz2', '.tar.7z', '.doc', '.docx', '.docm', '.xls',
+			'.xlsa', '.xlsx', '.xlsm', '.ppt', '.ppta', '.pptx', '.pptm', '.pdf', '.js', '.rtf', '.ttf', '.htm', '.html',
+			'.vbs', '.wsf'
+		]:
+			assert avt.is_included(DummyResource('/tmp/foo%s' % ext))
 
 	def test_is_included_by_mime_type(self):
 		avt = AmavisVT(Configuration())
@@ -109,6 +90,14 @@ class TestClientBasic(object):
 		assert not avt.is_included(DummyResource(mime_type='text/plain'))
 		assert not avt.is_included(DummyResource(mime_type='message/rfc822'))
 		assert not avt.is_included(DummyResource(mime_type='image/png'))
+
+	def test_is_infected(self, avt):
+		assert not avt.is_infected(0)
+		assert not avt.is_infected(1)
+		assert avt.is_infected(5)
+		assert avt.is_infected(50)
+
+		assert avt.is_infected(VTResponse(RAW_DUMMY_RESPONSE))
 
 
 class TestClientDatabase(object):
