@@ -487,11 +487,12 @@ class AmavisVT(object):
 					else:
 						hashes_for_vt.append((resource, resource.sha256))
 				else:
-					logger.debug("Skipping resource: %s", resource)
+					logger.debug("Skipping resource (not included): %s", resource)
 					continue
 
 			logger.info("Sending %s hashes to Virustotal", len(hashes_for_vt))
 			vt_results = list(self.check_vt(hashes_for_vt))
+			results.extend(vt_results)
 
 			if self.config.filename_pattern_detection:
 				logger.debug("Filename pattern detection enabled")
@@ -503,20 +504,23 @@ class AmavisVT(object):
 					# add the resource to the database
 					self.database.add_resource(resource, vtresult, resource_set.to_localpart, resource_set.to_domain)
 
-					if self.database.filename_pattern_match(resource, localpart=resource_set.to_localpart):
+					# only test for filename pattern if the resource hasn't identified as infected by its hash
+					if vtresult is None and self.database.filename_pattern_match(resource, localpart=resource_set.to_localpart):
 						logger.info("Flagging attachment %s as INFECTED (identified via filename pattern)", resource.filename)
 
+						try:
+							results.remove((resource, vtresult))
+						except ValueError:
+							pass
 						results.append((resource, FilenameResponse()))
 
 						if self.config.auto_report:
 							self.report_to_vt(resource)
 
-			results.extend(vt_results)
-
 			# update patterns for entries which have no pattern set yet
 			self.database.update_patterns()
 
-			return results
+			return [(resource, response) for resource, response in results if response]
 		finally:
 			clean_silent(self.clean_paths)
 			self.database.clean()
@@ -537,9 +541,20 @@ class AmavisVT(object):
 			return
 
 		try:
+			# create a dictionary of sha256 <> filename
+			query_d = dict((v, k) for k, v in checksums)
+
+			raw_checksums = [x[1] for x in checksums]
+
+			# get hashes from database that have a pattern but infected=0
+			clean_hashes = self.database.clean_hashes()
+			if clean_hashes:
+				logger.info("Piggy backing request to VT to send %s extra hashes" % len(clean_hashes))
+			send_checksums = sorted(list(set(raw_checksums + clean_hashes)))
+
 			response = requests.post(self.config.api_url, {
 				'apikey': self.config.apikey,
-				'resource': ', '.join([x[1] for x in checksums])
+				'resource': ', '.join(send_checksums)
 			}, timeout=float(self.config.timeout), headers={
 				'User-Agent': 'amavisvt/%s (+https://ercpe.de/projects/amavisvt)' % VERSION
 			})
@@ -550,32 +565,27 @@ class AmavisVT(object):
 			responses = response.json()
 			if not isinstance(responses, list):
 				responses = [responses]
+			responses = dict((d['sha256'], d) for d in responses)
 
-			for filename, checksum in checksums:
-				try:
-					d = [d for d in responses
-							if checksum in (
-								d.get('resource', None),
-								d.get('md5', None),
-								d.get('sha1', None),
-								d.get('sha256', None),
-							)][0]
-					vtr = VTResponse(d)
-					vtr.infected = vtr.positives >= self.config.hits_required
+			for sha256, data in responses.items():
+				vtr = VTResponse(data)
+				vtr.infected = self.is_infected(vtr)
 
-					if vtr.response_code:
-						logger.info("Saving in cache: %s", vtr.sha256)
-						expires = self.config.positive_expire if vtr.positives >= self.config.hits_required else self.config.negative_expire
-						self.set_in_cache(vtr.resource, d, expires)
-						logger.debug("Result for %s: %s" % (filename, vtr))
-						yield filename, vtr
-					else:
-						self.set_in_cache(vtr.resource, d, self.config.unknown_expire)
-						logger.debug("Skipping result (no scan report): %s", vtr.resource)
-						yield filename, None
+				cache_expires = self.config.unknown_expire
+				if vtr.response_code:
+					cache_expires = self.config.positive_expire if vtr.infected else self.config.negative_expire
 
-				except IndexError:
-					logger.warn("Got no response for %s (%s)", filename, checksum)
+				logger.info("Saving in cache: %s (expires in %s seconds)", vtr.sha256, cache_expires)
+				self.set_in_cache(vtr.resource, data, cache_expires)
+
+				logger.info("Updating database result for %s (infected: %s)", vtr.sha256, vtr.infected)
+				self.database.update_result(vtr)
+
+				if sha256 in query_d:
+					filename = query_d[sha256]
+					logger.debug("Result for %s: %s" % (filename, vtr))
+					yield filename, vtr
+
 		except:
 			logger.exception("Error asking virustotal about files")
 
@@ -585,10 +595,10 @@ class AmavisVT(object):
 			return
 
 		try:
-			logger.info("Reporting resource %s to virustotal", resource)
+			logger.info("Reporting resource %s (%s) to virustotal", resource, resource.filename)
 
 			files = {
-				'file': open(resource.path, 'rb'),
+				'file': (resource.filename, open(resource.path, 'rb')),
 			}
 			response = requests.post(self.config.report_url, data={
 										'apikey': self.config.apikey,
@@ -611,9 +621,14 @@ class AmavisVT(object):
 		from_cache = self.memcached.get(sha256hash)
 		if from_cache:
 			vtr = VTResponse(from_cache)
-			vtr.infected = vtr.positives >= self.config.hits_required
+			vtr.infected = self.is_infected(vtr)
 			return vtr
 
 	def set_in_cache(self, sha256hash, d, expire=0):
 		logger.debug("Saving key %s in cache. Expires in %s seconds", sha256hash, expire)
 		self.memcached.set(sha256hash, d, time=expire)
+
+	def is_infected(self, response_or_positive_hits):
+		if isinstance(response_or_positive_hits, VTResponse):
+			return response_or_positive_hits.positives >= self.config.hits_required
+		return int(response_or_positive_hits) >= self.config.hits_required

@@ -31,6 +31,11 @@ class BaseDatabase(object):  # pragma: no cover
 	def filename_pattern_match(self, resource, localpart=None):
 		raise NotImplementedError
 
+	def clean_hashes(self):
+		raise NotImplementedError
+
+	def update_result(self, vtresponse):
+		raise NotImplementedError
 
 class NoopDatabase(BaseDatabase):  # pragma: no cover
 	def connect(self):
@@ -55,4 +60,10 @@ class NoopDatabase(BaseDatabase):  # pragma: no cover
 		pass
 
 	def filename_pattern_match(self, resource, localpart=None):
+		pass
+
+	def clean_hashes(self):
+		return []
+
+	def update_result(self, vtresponse):
 		pass

@@ -212,3 +212,23 @@ class AmavisVTDatabase(BaseDatabase):
 					infected_percent)
 
 		return total >= self.config.min_filename_patterns and infected_percent >= self.config.min_infected_percent
+
+	def clean_hashes(self):
+		"""Query the database for hashes which have a pattern set but arent marked as infected
+		:returns a list of sha256 hashes"""
+
+		cursor = self.conn.cursor()
+		cursor.execute('SELECT DISTINCT sha256 FROM filenames WHERE pattern IS NOT NULL AND infected=0')
+		l = [x[0] for x in cursor.fetchall()]
+		self.conn.commit()
+		cursor.close()
+		return l
+
+	def update_result(self, vtresponse):
+		if not vtresponse or not vtresponse.infected:
+			return
+
+		cursor = self.conn.cursor()
+		cursor.execute('UPDATE filenames SET infected=1 WHERE sha256=? AND infected=0', (vtresponse.sha256, ))
+		self.conn.commit()
+		cursor.close()

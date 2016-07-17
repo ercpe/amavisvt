@@ -168,7 +168,7 @@ class TestClientReportToVT(object):
 				'apikey': 'my-api-key'
 			},
 			files={
-				'file': DummyFile()
+				'file': (__file__, DummyFile())
 			},
 			timeout=10.0,
 			headers={
@@ -193,7 +193,7 @@ class TestClientReportToVT(object):
 				'apikey': 'my-api-key'
 			},
 			files={
-				'file': DummyFile()
+				'file': (__file__, DummyFile())
 			},
 			timeout=10.0,
 			headers={
@@ -218,7 +218,7 @@ class TestClientReportToVT(object):
 				'apikey': 'my-api-key'
 			},
 			files={
-				'file': DummyFile()
+				'file': (__file__, DummyFile())
 			},
 			timeout=10.0,
 			headers={
@@ -267,7 +267,7 @@ class TestClientCheckVT(object):
 			"https://www.virustotal.com/vtapi/v2/file/report",
 			{
 				'apikey': 'my-api-key',
-				'resource': 'foo, bar, baz'
+				'resource': 'bar, baz, foo'
 			},
 			timeout=10.0,
 			headers={
@@ -291,7 +291,7 @@ class TestClientCheckVT(object):
 			"https://www.virustotal.com/vtapi/v2/file/report",
 			{
 				'apikey': 'my-api-key',
-				'resource': 'foo, bar, baz'
+				'resource': 'bar, baz, foo'
 			},
 			timeout=10.0,
 			headers={
@@ -368,7 +368,9 @@ class TestClientCheckVT(object):
 		assert len(result) == 1
 		filename, vtresult = result[0]
 		assert filename == 'foo.zip'
-		assert vtresult is None
+		assert vtresult is not None
+		assert isinstance(vtresult, VTResponse)
+		assert vtresult.infected
 
 
 class TestClientRun(object):
@@ -465,7 +467,7 @@ class TestClientRun(object):
 			"https://www.virustotal.com/vtapi/v2/file/report",
 			{
 				'apikey': 'my-api-key',
-				'resource': '93440551540584e48d911586606c319744c8e671c20ee6b12cca4b922127a127, 93440551540584e48d911586606c319744c8e671c20ee6b12cca4b922127a127'
+				'resource': '93440551540584e48d911586606c319744c8e671c20ee6b12cca4b922127a127'
 			},
 			timeout=10.0,
 			headers={
@@ -513,6 +515,7 @@ class TestClientRun(object):
 		# the localpart kwarg should be 'alice'
 		assert call_kwargs['localpart'] == 'alice'
 
+		print(result)
 		assert not result
 		assert not any([os.path.exists(p) for p in avt.clean_paths])
 
