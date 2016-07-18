@@ -565,7 +565,7 @@ class AmavisVT(object):
 			responses = response.json()
 			if not isinstance(responses, list):
 				responses = [responses]
-			responses = dict((d['sha256'], d) for d in responses)
+			responses = dict((d['sha256'], d) for d in responses if 'sha256' in d)
 
 			for sha256, data in responses.items():
 				vtr = VTResponse(data)
