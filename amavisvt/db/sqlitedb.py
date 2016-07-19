@@ -214,7 +214,7 @@ class AmavisVTDatabase(BaseDatabase):
 		return total >= self.config.min_filename_patterns and infected_percent >= self.config.min_infected_percent
 
 	def clean_hashes(self, limit=None):
-		"""Query the database for hashes which have a pattern set but arent marked as infected
+		"""Query the database for hashes which have a pattern set but aren't marked as infected
 		:returns a list of sha256 hashes"""
 
 		cursor = self.conn.cursor()
