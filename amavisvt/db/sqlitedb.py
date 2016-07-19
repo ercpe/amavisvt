@@ -218,7 +218,7 @@ class AmavisVTDatabase(BaseDatabase):
 		:returns a list of sha256 hashes"""
 
 		cursor = self.conn.cursor()
-		cursor.execute('SELECT DISTINCT sha256 FROM filenames WHERE pattern IS NOT NULL AND infected=0 LIMIT ?', (limit or 999))
+		cursor.execute('SELECT DISTINCT sha256 FROM filenames WHERE pattern IS NOT NULL AND infected=0 LIMIT ?', (limit or 999, ))
 		l = [x[0] for x in cursor.fetchall()]
 		self.conn.commit()
 		cursor.close()
