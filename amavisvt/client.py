@@ -551,6 +551,7 @@ class AmavisVT(object):
 			if clean_hashes:
 				logger.info("Piggy backing request to VT to send %s extra hashes" % len(clean_hashes))
 			send_checksums = sorted(list(set(raw_checksums + clean_hashes)))
+			logger.debug("Sending %s checksums", len(send_checksums))
 
 			response = requests.post(self.config.api_url, {
 				'apikey': self.config.apikey,
@@ -565,7 +566,9 @@ class AmavisVT(object):
 			responses = response.json()
 			if not isinstance(responses, list):
 				responses = [responses]
+			logger.debug("Got %s items in response", len(responses))
 			responses = dict((d['sha256'], d) for d in responses if 'sha256' in d)
+			logger.debug("Got %s complete items in response", len(responses))
 
 			for sha256, data in responses.items():
 				vtr = VTResponse(data)
