@@ -49,6 +49,8 @@ class Configuration(ConfigParser):
 		for k in [k for k in defaults.keys() if not defaults[k]]:
 			del defaults[k]
 
+		defaults.setdefault('socket-path', '/run/amavisvtd.sock')
+
 		defaults.setdefault('positive-expire', str(21 * 86400))
 		defaults.setdefault('negative-expire', str(12 * 3600))
 		defaults.setdefault('unknown-expire', str(12 * 3600))
@@ -80,6 +82,18 @@ class Configuration(ConfigParser):
 	@property
 	def apikey(self):
 		return self.get('DEFAULT', 'api-key')
+
+	@property
+	def socket_path(self):
+		return self.get('daemon', 'socket-path')
+
+	@property
+	def socket_permissions(self):
+		return self.get('daemon', 'socket-perm')
+
+	@property
+	def socket_group(self):
+		return self.get('daemon', 'socket-group')
 
 	@property
 	def positive_expire(self):
