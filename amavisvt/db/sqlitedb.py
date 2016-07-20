@@ -213,12 +213,15 @@ class AmavisVTDatabase(BaseDatabase):
 
 		return total >= self.config.min_filename_patterns and infected_percent >= self.config.min_infected_percent
 
-	def clean_hashes(self, limit=None):
-		"""Query the database for hashes which have a pattern set but aren't marked as infected
+	def get_clean_hashes(self, limit=None):
+		"""Query the database for hashes which have a pattern set but aren't marked as infected. Returns a **random** list
+		of at most ``limit`` (or 999 if ``limit`` is ``None``).
+		This is to avoid sending the same hashes over and over without receiving a result.
+
 		:returns a list of sha256 hashes"""
 
 		cursor = self.conn.cursor()
-		cursor.execute('SELECT DISTINCT sha256 FROM filenames WHERE pattern IS NOT NULL AND infected=0 LIMIT ?', (limit or 999, ))
+		cursor.execute('SELECT DISTINCT sha256 FROM filenames WHERE pattern IS NOT NULL AND infected=0 ORDER BY RANDOM() LIMIT ?', (limit or 999, ))
 		l = [x[0] for x in cursor.fetchall()]
 		self.conn.commit()
 		cursor.close()

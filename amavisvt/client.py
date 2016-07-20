@@ -547,7 +547,7 @@ class AmavisVT(object):
 			raw_checksums = [x[1] for x in checksums]
 
 			# get hashes from database that have a pattern but infected=0
-			clean_hashes = self.database.clean_hashes(15)
+			clean_hashes = self.database.get_clean_hashes(15)
 			if clean_hashes:
 				logger.info("Piggy backing request to VT to send %s extra hashes" % len(clean_hashes))
 			send_checksums = sorted(list(set(raw_checksums + clean_hashes)))
