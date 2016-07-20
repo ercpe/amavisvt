@@ -240,9 +240,9 @@ class TestAmavisVTDatabase(object):
 		cursor = testdb.conn.cursor()
 		sql = "INSERT INTO filenames (filename, pattern, infected, timestamp, sha256) VALUES (?, ?, ?, ?, ?)"
 		data = [
-			(u'foo-bar-1.zip', None, 1, 0, u'foo-bar-1'),
-			(u'foo-bar-2.zip', None, 1, 0, u'foo-bar-2'),
-			(u'foo-bar-3.zip', None, 1, 0, u'foo-bar-3'),
+			(u'foo-bar-111.zip', None, 1, 0, u'foo-bar-1'),
+			(u'foo-bar-222.zip', None, 1, 0, u'foo-bar-2'),
+			(u'foo-bar-333.zip', None, 1, 0, u'foo-bar-3'),
 		]
 		cursor.executemany(sql, data)
 		testdb.conn.commit()

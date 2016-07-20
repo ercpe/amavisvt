@@ -46,6 +46,15 @@ class TestPatterns(object):
 			('foo-bar-baz', None),
 		), localpart=None) is None
 
+	def test_random_not_long_enough(self):
+		assert patterns.calculate('foobar-1.zip', (
+			('foobar-2.zip', None),
+		)) == 'foobar-1-zip'
+
+		assert patterns.calculate('foobar-11.zip', (
+			('foobar-2.zip', None),
+		)) == 'foobar-11-zip'
+
 	def test_pattern_ok(self):
 		"""Positive test of pattern.calculate - expect that a simple pattern can be calculated"""
 
@@ -66,6 +75,24 @@ class TestPatterns(object):
 			('bah-bar-bar', 'bah'),
 			('tah-bar-123', 'tah'),
 		], localpart='foo') == '[LOCALPART]-bar-[RANDOM]'
+
+	def test_pattern_localpart_with_splitchar(self):
+		localpart = "foo.bar"
+
+		l = [
+			('foo.bar-invoice.zip', '[LOCALPART]-[STATIC]-zip'),
+			('invoice-foo.bar-invoice.zip', '[STATIC]-[LOCALPART]-[STATIC]-zip'),
+		]
+
+		for s, p in l:
+			assert patterns.calculate(s, [
+				('webmaster-spreadsheet.zip', 'webmaster'),
+				('invoice-webmaster-invoice.zip', 'webmaster'),
+			], localpart=localpart) == p
+
+	def test_string_split_null_or_empty(self):
+		assert patterns.split_chunks(None, None) == ()
+		assert patterns.split_chunks('', None) == ()
 
 	def test_string_split(self):
 		for separator in '_', '-', '.', ' ':

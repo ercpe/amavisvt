@@ -21,27 +21,35 @@ STATIC_WORDS = (
 )
 
 def split_chunks(s, localpart=None):
-	s = (s or "").strip()
+	s = (s or "").lower().strip()
 
 	if not s:
 		return ()
 
-	s = start_clean_re.sub('', s.lower())
+	if localpart:
+		# replace the localpart in s before splitting the string to catch localparts with on of the splitchars in it
+		r = re.compile(r'(?:%s|\b)(%s)(?:%s|\b)' % (SPLIT_CHARS, re.escape(localpart), SPLIT_CHARS), flags=re.IGNORECASE)
+
+		m = r.search(s)
+		while m:
+			start = m.start(1)
+			end = m.end(1)
+			s = "%s%s%s" % (s[:start], '[LOCALPART]', s[end:])
+			m = r.search(s)
+
+	s = start_clean_re.sub('', s)
 	s = end_clean_re.sub('', s)
 
 	chunks = chunk_split_re.split(s)
 	chunks = [x for x in chunks if x.strip()] # remove all empty parts
 
-	# - replace any chunk that matches the local part with [LOCALPART]
 	# - replace any chunk that matches one of the static words with [STATIC]
 	for i in range(0, len(chunks)):
-		if localpart and chunks[i] == localpart:
-			chunks[i] = '[LOCALPART]'
-		elif chunks[i] in STATIC_WORDS:
+		# TODO: Handle multi word STATIC_WORD
+		if chunks[i] in STATIC_WORDS:
 			chunks[i] = '[STATIC]'
 
 	return chunks
-
 
 def calculate(filename, choices, localpart=None):
 	"""Calculates the pattern of the given string in filename using the tuples in choices to find similarities."""
@@ -69,4 +77,14 @@ def calculate(filename, choices, localpart=None):
 		if len(list(filter(lambda x: x != 100, ratios))) > 1:
 			continue
 
-		return '-'.join([chunks[i] if ratios[i] == 100 else '[RANDOM]'for i in range(0, len(chunks))])
+		def _build_pattern():
+			for i in range(0, len(chunks)):
+				if ratios[i] == 100:
+					yield chunks[i]
+				else:
+					if len(chunks[i]) > 2:
+						yield '[RANDOM]'
+					else:
+						yield chunks[i]
+
+		return '-'.join(list(_build_pattern()))
