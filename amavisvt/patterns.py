@@ -17,7 +17,7 @@ MIN_CHUNKS = 2
 STATIC_WORDS = (
 	'profile', 'invoice', 'copy', 'copies', 'unpaid', 'forward',
 	'update', 'updated', 'report', 'details', 'document', 'history',
-	'caution',
+	'caution', 'account', 'spreadsheet'
 )
 
 def split_chunks(s, localpart=None):
@@ -26,7 +26,7 @@ def split_chunks(s, localpart=None):
 	if not s:
 		return ()
 
-	s = start_clean_re.sub('', s)
+	s = start_clean_re.sub('', s.lower())
 	s = end_clean_re.sub('', s)
 
 	chunks = chunk_split_re.split(s)
