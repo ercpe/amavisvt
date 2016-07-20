@@ -5,6 +5,8 @@ import logging
 import os
 import re
 
+from amavisvt.client import AmavisVT
+
 logger = logging.getLogger(__file__)
 
 try:
@@ -19,13 +21,19 @@ class ThreadedRequestHandler(socketserver.BaseRequestHandler):
 
 	def handle(self):
 		data = self.request.recv(1024)
-		command, args = self.parse_command(data)
+		command, argument = self.parse_command(data)
 
 		if command:
 			logger.info("Handling '%s' command", command)
 
 		if command == "PING":
 			self.send_response('PONG')
+		elif command == "CONTSCAN":
+			if os.path.exists(argument):
+				self.do_contscan(argument)
+			else:
+				logger.error("Cannot handle CONTSCAN command with argument '%s'", argument)
+				self.send_response("ERROR: Wrong argument '%s' for command '%s'" % (argument, command))
 		else:
 			self.send_response("ERROR: Unknown command '%s'" % command)
 
@@ -37,6 +45,19 @@ class ThreadedRequestHandler(socketserver.BaseRequestHandler):
 
 	def send_response(self, msg):
 		self.request.sendall(msg)
+
+	def do_contscan(self, directory):
+		for resource, scan_result in AmavisVT(self.config).run(directory):
+			if scan_result is None:
+				self.request.sendall("%s: Not scanned by virustotal" % resource)
+			elif isinstance(scan_result, Exception):
+				self.request.sendall("%s: Error (%s)" % (resource, scan_result))
+			else:
+				if scan_result.infected:
+					matches = [v['result'] for _, v in scan_result.scans.items() if v['detected']][:5]
+					self.request.sendall("%s: Detected as %s (%s of %s)" % (resource, ', '.join(set(matches)), scan_result.positives, scan_result.total))
+				else:
+					self.request.sendall("%s: Clean" % resource)
 
 
 class ThreadedUnixSocketServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
