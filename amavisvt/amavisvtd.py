@@ -53,8 +53,7 @@ if __name__ == "__main__":
 	error = False
 
 	try:
-		config = Configuration()
-		daemon = AmavisVTDaemon(config, socket_path=args.socket)
+		daemon = AmavisVTDaemon(socket_path=args.socket)
 		daemon.run_and_wait()
 
 		while True:

@@ -5,7 +5,7 @@ import logging
 import os
 import re
 
-from amavisvt.client import AmavisVT
+from amavisvt.client import AmavisVT, Configuration
 
 logger = logging.getLogger(__file__)
 
@@ -19,12 +19,18 @@ BUFFER_SIZE = 4096
 
 class ThreadedRequestHandler(socketserver.BaseRequestHandler):
 
+	def __init__(self, *args, **kwargs):
+		# fixme: this is a dirty way to get a Configuration instance in the request handler
+		# as it will re-read the configuration on every command which can lead to unexpected behaviour
+		self.config = Configuration()
+		socketserver.BaseRequestHandler.__init__(self, *args, **kwargs)
+
 	def handle(self):
 		data = self.request.recv(1024)
 		command, argument = self.parse_command(data)
 
 		if command:
-			logger.info("Handling '%s' command", command)
+			logger.info("Dispatching '%s' command", command)
 
 		if command == "PING":
 			self.send_response('PONG')
@@ -38,26 +44,35 @@ class ThreadedRequestHandler(socketserver.BaseRequestHandler):
 			self.send_response("ERROR: Unknown command '%s'" % command)
 
 	def parse_command(self, data):
-		m = re.match(r"^([\w\d]+)(?:\s?(.*))", data, re.IGNORECASE)
+		if '\n' in data:
+			s = data[:data.index('\n')]
+			garbage = data[len(s):]
+			if garbage:
+				logger.info("Received %s chars garbage after command", len(garbage))
+		else:
+			s = data
+		m = re.match(r"^([\w\d]+)(?:\s?(.*))", s, re.IGNORECASE)
 		if m:
-			return (m.group(1), m.group(2))
+			return m.group(1), m.group(2)
 		return None, None
 
 	def send_response(self, msg):
 		self.request.sendall(msg)
 
 	def do_contscan(self, directory):
+		responses = []
 		for resource, scan_result in AmavisVT(self.config).run(directory):
 			if scan_result is None:
-				self.request.sendall("%s: Not scanned by virustotal" % resource)
+				responses.append("%s: Not scanned by virustotal" % resource)
 			elif isinstance(scan_result, Exception):
-				self.request.sendall("%s: Error (%s)" % (resource, scan_result))
+				responses.append("%s: Error (%s)" % (resource, scan_result))
 			else:
 				if scan_result.infected:
 					matches = [v['result'] for _, v in scan_result.scans.items() if v['detected']][:5]
-					self.request.sendall("%s: Detected as %s (%s of %s)" % (resource, ', '.join(set(matches)), scan_result.positives, scan_result.total))
+					responses.append("%s: Detected as %s (%s of %s)" % (resource, ', '.join(set(matches)), scan_result.positives, scan_result.total))
 				else:
-					self.request.sendall("%s: Clean" % resource)
+					responses.append("%s: Clean" % resource)
+		self.request.sendall('\n'.join(responses))
 
 
 class ThreadedUnixSocketServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
@@ -66,11 +81,11 @@ class ThreadedUnixSocketServer(socketserver.ThreadingMixIn, socketserver.UnixStr
 
 class AmavisVTDaemon(object):
 
-	def __init__(self, config, socket_path=None):
+	def __init__(self, socket_path=None):
 		self.server = None
 		self.server_thread = None
-		self.config = config
-		self.socket_path = socket_path or config.socket_path
+		self.config = Configuration()
+		self.socket_path = socket_path or self.config.socket_path
 
 	def run_and_wait(self):
 		if os.path.exists(self.socket_path):
