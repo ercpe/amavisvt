@@ -1,5 +1,5 @@
 # Project dependencies
-requests
+requests>=2.9.1
 filemagic
 python-memcached
 fuzzywuzzy
