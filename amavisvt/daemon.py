@@ -81,7 +81,7 @@ class ThreadedRequestHandler(socketserver.BaseRequestHandler):
 				responses.append("%s: Error (%s)" % (resource, scan_result))
 			else:
 				if scan_result.infected:
-					matches = [v['result'] for _, v in scan_result.scans.items() if v['detected']][:5]
+					matches = [v['result'] for _, v in scan_result.scans.items() if v['detected']][:3]
 					responses.append("%s: Detected as %s (%s of %s)" % (resource, ', '.join(set(matches)), scan_result.positives, scan_result.total))
 				else:
 					responses.append("%s: Clean" % resource)
