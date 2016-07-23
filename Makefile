@@ -1,15 +1,15 @@
 TARGET?=tests
 
 test_default_python:
-	PYTHONPATH="." python -m pytest tests/ --junit-xml testresults.xml -rxs -v
+	PYTHONPATH="." python -m pytest tests/ --junit-xml testresults.xml -rxsw -v
 
 test_py2:
 	@echo Executing test with python2
-	PYTHONPATH="." python2 -m pytest tests/ --junit-xml testresults.xml -rxs -v
+	PYTHONPATH="." python2 -m pytest tests/ --junit-xml testresults.xml -rxsw -v
 
 test_py3:
 	@echo Executing test with python3
-	PYTHONPATH="." python3 -m pytest tests/ --junit-xml testresults.xml -rxs -v
+	PYTHONPATH="." python3 -m pytest tests/ --junit-xml testresults.xml -rxsw -v
 
 test: test_py2 test_py3
 
