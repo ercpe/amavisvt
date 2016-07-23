@@ -7,8 +7,6 @@ from logging.handlers import SysLogHandler
 
 import sys
 
-from amavisvt.client import Configuration
-
 from amavisvt.daemon import AmavisVTDaemon
 
 logger = logging.getLogger(__file__)
