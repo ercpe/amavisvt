@@ -2,7 +2,8 @@
 import pytest
 import datetime
 
-from amavisvt.client import Configuration, Resource, VTResponse
+from amavisvt.client import Resource, VTResponse
+from amavisvt.config import AmavisVTConfigurationParser
 from amavisvt.db.base import NoopDatabase
 from amavisvt.db.sqlitedb import AmavisVTDatabase
 
@@ -15,7 +16,7 @@ is_real_database = pytest.mark.skipif(Database == NoopDatabase, reason='sqlite o
 
 @pytest.fixture
 def testdb():
-	return Database(config=Configuration({'database-path': ':memory:' }, path='/dev/null'))
+	return Database(config=AmavisVTConfigurationParser({'database-path': ':memory:' }, path='/dev/null'))
 
 FAKE_TIME = datetime.datetime(2016, 7, 3, 7, 0, 0)
 FAKE_TIME_S = FAKE_TIME.strftime("%Y-%m-%d %H:%M:%S")
@@ -75,7 +76,7 @@ class DummyVTResult(VTResponse):
 class TestAmavisVTDatabase(object):
 
 	def test_close_already_closed(self, tmpdir):
-		db = Database(config=Configuration({
+		db = Database(config=AmavisVTConfigurationParser({
 			'database-path': str(tmpdir + '/database.sqlite3')
 		}, path='/dev/null'))
 		db.conn.close()
@@ -83,7 +84,7 @@ class TestAmavisVTDatabase(object):
 		db.close()
 
 	def test_check_schema_empty_database(self, tmpdir):
-		db = Database(config=Configuration({
+		db = Database(config=AmavisVTConfigurationParser({
 			'database-path': str(tmpdir + '/database.sqlite3')
 		}, path='/dev/null'))
 		db.close()

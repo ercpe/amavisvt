@@ -5,7 +5,8 @@ import logging
 import os
 import re
 
-from amavisvt.client import AmavisVT, Configuration
+from amavisvt.client import AmavisVT
+from amavisvt.config import Configuration
 
 logger = logging.getLogger(__file__)
 

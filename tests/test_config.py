@@ -1,29 +1,29 @@
 # -*- coding: utf-8 -*-
-from amavisvt.client import Configuration
+from amavisvt.config import AmavisVTConfigurationParser
 
 
 class TestConfig(object):
 
 	def test_init(self):
-		c = Configuration(path='/dev/null')
+		c = AmavisVTConfigurationParser(path='/dev/null')
 		assert True
 
 	def test_cliargs(self):
-		c = Configuration(cliargs={
+		c = AmavisVTConfigurationParser(cliargs={
 			'foo': 'bar'
 		}, path='/dev/null')
 
 		assert c.get('DEFAULT', 'foo') == 'bar'
 
 	def test_none_cliargs_removed(self):
-		c = Configuration(cliargs={
+		c = AmavisVTConfigurationParser(cliargs={
 			'foo': None
 		}, path='/dev/null')
 
 		assert not c.has_option('DEFAULT', 'foo')
 
 	def test_default_options(self):
-		c = Configuration(cliargs={
+		c = AmavisVTConfigurationParser(cliargs={
 			'api-key': 'api-key'
 		}, path='/dev/null')
 

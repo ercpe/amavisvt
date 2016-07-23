@@ -6,7 +6,8 @@ import requests
 import shutil
 
 from amavisvt import VERSION
-from amavisvt.client import AmavisVT, Configuration, Resource, VTResponse
+from amavisvt.client import AmavisVT, Resource, VTResponse
+from amavisvt.config import AmavisVTConfigurationParser
 from amavisvt.db.base import NoopDatabase
 import mock
 import pytest
@@ -54,7 +55,7 @@ RAW_DUMMY_RESPONSE = {
 
 @pytest.fixture
 def avt():
-	return AmavisVT(Configuration({
+	return AmavisVT(AmavisVTConfigurationParser({
 		'database-path': ':memory:',
 		'api-key': 'my-api-key'
 	}, path='/dev/null'))
@@ -68,7 +69,7 @@ class DummyFile():
 class TestClientBasic(object):
 
 	def test_is_included_by_extension(self):
-		avt = AmavisVT(Configuration())
+		avt = AmavisVT(AmavisVTConfigurationParser())
 
 		for ext in [
 			'.exe', '.com', '.bat', '.cmd', '.tar.gz', '.zip', '.tar.bz2', '.tar.7z', '.doc', '.docx', '.docm', '.xls',
@@ -78,7 +79,7 @@ class TestClientBasic(object):
 			assert avt.is_included(DummyResource('/tmp/foo%s' % ext))
 
 	def test_is_included_by_mime_type(self):
-		avt = AmavisVT(Configuration())
+		avt = AmavisVT(AmavisVTConfigurationParser())
 
 		assert avt.is_included(DummyResource(mime_type='application/octect-stream'))
 		assert avt.is_included(DummyResource(mime_type='application/foobar'))
@@ -103,7 +104,7 @@ class TestClientBasic(object):
 class TestClientDatabase(object):
 
 	def test_database_fallback(self):
-		c = Configuration({
+		c = AmavisVTConfigurationParser({
 			'database-path': '/dev/null',
 		}, path='/dev/null')
 		avt = AmavisVT(c)
@@ -137,7 +138,7 @@ class TestClientCache(object):
 class TestClientReportToVT(object):
 	@mock.patch('amavisvt.client.requests.post')
 	def test_report_to_vt_pretend(self, requests_post):
-		avt = AmavisVT(Configuration({
+		avt = AmavisVT(AmavisVTConfigurationParser({
 			'database-path': ':memory:',
 			'api-key': 'my-api-key',
 			'pretend': 'true'
@@ -220,7 +221,7 @@ class TestClientCheckVT(object):
 
 	@mock.patch('amavisvt.client.requests.post')
 	def test_check_vt_pretend(self, requests_post):
-		avt = AmavisVT(Configuration({
+		avt = AmavisVT(AmavisVTConfigurationParser({
 			'database-path': ':memory:',
 			'api-key': 'my-api-key',
 			'pretend': 'true'
@@ -232,7 +233,7 @@ class TestClientCheckVT(object):
 
 	@mock.patch('amavisvt.client.requests.post')
 	def test_check_vt_no_checksums(self, requests_post):
-		avt = AmavisVT(Configuration({
+		avt = AmavisVT(AmavisVTConfigurationParser({
 			'database-path': ':memory:',
 			'api-key': 'my-api-key',
 		}, path='/dev/null'))
@@ -478,7 +479,7 @@ class TestClientRun(object):
 		database_mock.filename_pattern_match = mock.MagicMock()
 		database_mock.filename_pattern_match.return_value = False
 
-		avt = AmavisVT(Configuration({
+		avt = AmavisVT(AmavisVTConfigurationParser({
 			'database-path': ':memory:',
 			'api-key': 'my-api-key',
 			'filename-pattern-detection': 'true'
@@ -518,7 +519,7 @@ class TestClientRun(object):
 		database_mock.filename_pattern_match = mock.MagicMock()
 		database_mock.filename_pattern_match.return_value = True
 
-		avt = AmavisVT(Configuration({
+		avt = AmavisVT(AmavisVTConfigurationParser({
 			'database-path': ':memory:',
 			'api-key': 'my-api-key',
 			'filename-pattern-detection': 'true'
@@ -562,7 +563,7 @@ class TestClientRun(object):
 		database_mock.filename_pattern_match = mock.MagicMock()
 		database_mock.filename_pattern_match.return_value = True
 
-		avt = AmavisVT(Configuration({
+		avt = AmavisVT(AmavisVTConfigurationParser({
 			'database-path': ':memory:',
 			'api-key': 'my-api-key',
 			'filename-pattern-detection': 'true',
