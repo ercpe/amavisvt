@@ -21,30 +21,33 @@ BUFFER_SIZE = 4096
 class ThreadedRequestHandler(socketserver.BaseRequestHandler):
 
 	def __init__(self, *args, **kwargs):
-		# fixme: this is a dirty way to get a Configuration instance in the request handler
-		# as it will re-read the configuration on every command which can lead to unexpected behaviour
 		self.config = Configuration()
 		socketserver.BaseRequestHandler.__init__(self, *args, **kwargs)
 
 	def handle(self):
-		data = self.request.recv(1024)
-		command, argument = self.parse_command(data)
+		temp = self.request.recv(BUFFER_SIZE)
+		data = temp
+		
+		if '\n' not in data:
+			logger.error("Invalid data received: '%s'" % data)
+			self.send_response("ERROR: Invalid data: '%s'" % data)
+			return
+
+		# parse received data into "command" and argument
+		command, argument = self.parse_command(data.strip())
 
 		if command:
 			logger.info("Dispatching '%s' command", command)
 
 		if command == "PING":
-			self.send_response('PONG')
+			self.do_ping()
 		elif command == "CONTSCAN":
-			if os.path.exists(argument):
-				self.do_contscan(argument)
-			else:
-				logger.error("Cannot handle CONTSCAN command with argument '%s'", argument)
-				self.send_response("ERROR: Wrong argument '%s' for command '%s'" % (argument, command))
+			self.do_contscan(argument)
 		else:
 			self.send_response("ERROR: Unknown command '%s'" % command)
 
 	def parse_command(self, data):
+		data = data or ""
 		if '\n' in data:
 			s = data[:data.index('\n')]
 			garbage = data[len(s):]
@@ -60,9 +63,18 @@ class ThreadedRequestHandler(socketserver.BaseRequestHandler):
 	def send_response(self, msg):
 		self.request.sendall(msg)
 
+	def do_ping(self):
+		self.send_response('PONG')
+
 	def do_contscan(self, directory):
+		if not directory or not os.path.exists(directory):
+			logger.error("Cannot handle CONTSCAN command with argument '%s' (path does not exist)", directory)
+			self.send_response("ERROR: Wrong argument '%s'" % directory)
+			return
+		
 		responses = []
-		for resource, scan_result in AmavisVT(self.config).run(directory):
+		avt = AmavisVT(self.config)
+		for resource, scan_result in avt.run(directory):
 			if scan_result is None:
 				responses.append("%s: Not scanned by virustotal" % resource)
 			elif isinstance(scan_result, Exception):
@@ -127,11 +139,8 @@ class AmavisVTDaemon(object):
 	def stop(self):
 		"""Stops the daemon."""
 
-		if not self.server:
-			return
-
-		logger.info("Shutting down")
-		self.server.shutdown()
-		self.server.server_close()
-		self.server = None
-		os.remove(self.socket_path)
+		if self.server:
+			logger.info("Shutting down")
+			self.server.shutdown()
+			self.server.server_close()
+			os.remove(self.socket_path)
