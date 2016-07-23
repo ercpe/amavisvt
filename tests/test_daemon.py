@@ -133,10 +133,15 @@ class TestRequestHandler(object):
 		
 		assert avt.called
 		run_mock.assert_called_with('/')
-		request_mock.sendall.assert_called_with('\n'.join(['test.zip: Clean',
-														   'other.zip: Not scanned by virustotal',
-														   'broken.zip: Error (broken)',
-														   'infected.zip: Detected as Trojan.Generic.3611249, Trojan.KillAV, a variant of Win32/Qhost.NTY, Generic.dx!rkx, Trojan/VB.gen (40 of 40)']))
+		assert request_mock.sendall.called
+		call_args, call_kwargs =  request_mock.sendall.call_args
+		assert len(call_args) == 1
+		lines = call_args[0].split('\n')
+		assert len(lines) == 4
+		assert lines[0] == 'test.zip: Clean'
+		assert lines[1] == 'other.zip: Not scanned by virustotal'
+		assert lines[2] == 'broken.zip: Error (broken)'
+		assert lines[3].startswith('infected.zip: Detected as ')
 		
 	
 	def test_parse_command_invalid(self):
@@ -160,11 +165,11 @@ class TestRequestHandler(object):
 class TestDaemonSocketWorking(object):
 
 	def test_is_socket_working_error(self):
-		d = AmavisVTDaemon()
+		d = AmavisVTDaemon('dummy-socket')
 		assert not d.is_socket_working('dummy-socket')
 
 	def test_stop_do_nothing(self):
-		d = AmavisVTDaemon()
+		d = AmavisVTDaemon('dummy-socket')
 		d.stop()
 		assert True
 
