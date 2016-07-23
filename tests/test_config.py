@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from amavisvt.config import AmavisVTConfigurationParser
+from amavisvt.config import AmavisVTConfigurationParser, Configuration
 
 
 class TestConfig(object):
@@ -43,3 +43,8 @@ class TestConfig(object):
 		assert c.min_infected_percent == 0.7
 		assert c.auto_report is False
 
+	def test_config_singleton(self):
+		a = id(Configuration())
+		b = id(Configuration())
+
+		assert a == b
