@@ -158,13 +158,15 @@ class VTResponse(object):
 
 class FilenameResponse(VTResponse):
 
-	def __init__(self):
+	def __init__(self, reported=False):
 		super(FilenameResponse, self).__init__(virustotal_response={
 			'resource': '<filename>',
 			'scans': {
 				'filename pattern': {
 					'detected': True,
-					'result': 'filename pattern matches infected files'
+					'result': 'filename pattern matches infected files%s' % (
+						', reported' if reported else ''
+					)
 				}
 			},
 			'positives': 1,
@@ -512,10 +514,13 @@ class AmavisVT(object):
 							results.remove((resource, vtresult))
 						except ValueError:
 							pass
-						results.append((resource, FilenameResponse()))
+						
+						reported = False
 
 						if self.config.auto_report:
-							self.report_to_vt(resource)
+							reported = self.report_to_vt(resource)
+
+						results.append((resource, FilenameResponse(reported)))
 
 			# update patterns for entries which have no pattern set yet
 			self.database.update_patterns()
@@ -617,8 +622,11 @@ class AmavisVT(object):
 
 			vtr = VTResponse(response.json())
 			logger.info("Report result: %s", vtr)
+			
+			return True
 		except:
 			logger.exception("Error reporting %s to virustotal", resource)
+			return False
 
 	def get_from_cache(self, sha256hash):
 		from_cache = self.memcached.get(sha256hash)
