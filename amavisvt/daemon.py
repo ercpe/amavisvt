@@ -72,7 +72,8 @@ class ThreadedRequestHandler(socketserver.BaseRequestHandler):
 	def do_ping(self):
 		self.send_response('PONG')
 
-	def do_contscan(self, directory):
+	def do_contscan(self, directory_argument):
+		directory = os.path.abspath(directory_argument) if directory_argument else ''
 		if not directory or not os.path.exists(directory):
 			logger.error("Cannot handle CONTSCAN command with argument '%s' (path does not exist)", directory)
 			self.send_response("ERROR: Wrong argument '%s'" % directory)
@@ -93,7 +94,8 @@ class ThreadedRequestHandler(socketserver.BaseRequestHandler):
 					responses.append("%s: Clean" % resource)
 		self.request.sendall('\n'.join(responses))
 
-	def do_report(self, filename):
+	def do_report(self, filename_argument):
+		filename = os.path.abspath(filename_argument)
 		if not (os.path.exists(filename) and os.path.isfile(filename) and os.access(filename, os.R_OK)):
 			logger.error("File does not exist or is inaccessible: '%s'", filename)
 			self.send_response("ERROR: File does not exist or is inaccessible: '%s'" % filename)

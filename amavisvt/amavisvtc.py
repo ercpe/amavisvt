@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import logging
+import os
 import socket
 from argparse import ArgumentParser
 
@@ -29,7 +30,11 @@ class AmavisVTClient(object):
 		try:
 			sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 			sock.connect(self.socket_path)
-			s = "%s %s" % (translate.get(command, command.upper()), ' '.join(arguments))
+
+			# send absolute paths to amavisvtd
+			absolute_args = [os.path.abspath(p) for p in arguments]
+			s = "%s %s" % (translate.get(command, command.upper()), ' '.join(absolute_args))
+
 			sock.sendall(s.strip() + "\n")
 
 			data = sock.recv(BUFFER_SIZE)
