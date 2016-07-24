@@ -26,17 +26,13 @@ First, create an account on virustotal.com to obtain your API key. After registr
 
 Please note, the location of memcached isn't configurable at the moment. The instance has to run on `127.0.0.1:11211` and must accept connections from localhost.
 
-As a last step, configure amavisd-new by adding the following snippet to either `@av_scanners` or `@av_scanners_backup`:
+As a last step, configure amavisd-new by adding the following snippet to either `@av_scanners` or `@av_scanners_backup`. Starting with 0.4 AmavisVT uses a daemon:
 
-    ['AmavisVT', 'amavisvt',
-        '-v {}',
-        [0], [1],
-        qr/(?:Detected as) (.*)(?:\033|$)/m ],
-
-After that, restart amavisd-new. If all went well, you should see a line like this in your logfile:
-
-    Found primary av scanner AmavisVT    at /usr/bin/amavisvt
-
+   ['AmavisVTd',
+        \&ask_daemon, ["CONTSCAN {}\n", "/var/amavis/amavisvtd.sock"],
+        undef,
+        qr/(?:Detected as) (.*)/m,
+        qr/(?:Detected as) (.*)/m],
 
 ## License
 
