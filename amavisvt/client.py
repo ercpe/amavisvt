@@ -453,12 +453,22 @@ class AmavisVT(object):
 		resources = []
 
 		if os.path.isfile(file_or_directory):
-			resources.append(Resource(file_or_directory, cleanup=False))
+			if os.access(file_or_directory, os.R_OK):
+				resources.append(Resource(file_or_directory, cleanup=False))
+			else:
+				logger.info("Skipping inaccessible file %s", file_or_directory)
 		elif os.path.isdir(file_or_directory):
 			for root, dirs, files in os.walk(file_or_directory):
 				for f in files:
 					p = os.path.join(root, f)
-					resources.append(Resource(p, cleanup=False))
+					
+					if not os.path.isfile(p):
+						continue
+					
+					if os.access(p, os.R_OK):
+						resources.append(Resource(p, cleanup=False))
+					else:
+						logger.info("Skipping inaccessible file %s", file_or_directory)
 
 		return self.process(ResourceSet(resources))
 
