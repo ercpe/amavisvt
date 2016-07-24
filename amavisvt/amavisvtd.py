@@ -11,30 +11,7 @@ from amavisvt.daemon import AmavisVTDaemon
 
 logger = logging.getLogger(__file__)
 
-if __name__ == "__main__":
-	parser = ArgumentParser()
-	parser.add_argument('-v', '--verbose', action='count', help='Increase verbosity', default=2)
-	parser.add_argument('-d', '--debug', action='store_true', default=False, help='Send verbose log messages to stdout too')
-	parser.add_argument('-s', '--socket', help='Socket path')
-
-	args = parser.parse_args()
-
-	logging.basicConfig(
-		level=logging.FATAL - (10 * args.verbose),
-		format='%(asctime)s %(levelname)-7s [%(threadName)s] %(message)s',
-	)
-
-	logger = logging.getLogger()
-
-	if not args.debug:
-		for h in logger.handlers:
-			h.setLevel(logging.ERROR)
-
-	handler = SysLogHandler(address='/dev/log')
-	formatter = logging.Formatter('amavisvt: %(threadName)s - %(message)s')
-	handler.setFormatter(formatter)
-	logger.addHandler(handler)
-
+def main(args):
 	logger.info("Starting up")
 	daemon = None
 	shutdown_sig = threading.Event()
@@ -59,7 +36,6 @@ if __name__ == "__main__":
 			if shutdown_sig.is_set():
 				break
 	except KeyboardInterrupt:
-		pass
 		error = True
 	except:
 		logger.exception("Server error")
@@ -68,4 +44,30 @@ if __name__ == "__main__":
 		if daemon:
 			daemon.stop()
 
-	sys.exit(int(error))
+	return error
+
+if __name__ == "__main__":  # pragma: no cover
+	parser = ArgumentParser()
+	parser.add_argument('-v', '--verbose', action='count', help='Increase verbosity', default=2)
+	parser.add_argument('-d', '--debug', action='store_true', default=False, help='Send verbose log messages to stdout too')
+	parser.add_argument('-s', '--socket', help='Socket path')
+
+	args = parser.parse_args()
+
+	logging.basicConfig(
+		level=logging.FATAL - (10 * args.verbose),
+		format='%(asctime)s %(levelname)-7s [%(threadName)s] %(message)s',
+	)
+
+	logger = logging.getLogger()
+
+	if not args.debug:
+		for h in logger.handlers:
+			h.setLevel(logging.ERROR)
+
+	handler = SysLogHandler(address='/dev/log')
+	formatter = logging.Formatter('amavisvt: %(threadName)s - %(message)s')
+	handler.setFormatter(formatter)
+	logger.addHandler(handler)
+
+	sys.exit(int(main(args)))

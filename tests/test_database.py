@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import mock
 import pytest
 import datetime
 
@@ -295,4 +296,39 @@ class TestAmavisVTDatabase(object):
 		self.validate_filenames_in_database(testdb, [
 			(u'foo-bar-123.zip', u'foo-bar-[RANDOM]-zip', 0, FAKE_TIME_S, u'sha256'),
 			(u'foo-bar-baz.zip', None, 0, FAKE_TIME_S, u'sha256')
+		])
+
+	def test_update_result_no_vtresponse(self, testdb):
+		testdb.conn = mock.MagicMock()
+		cursor_mock = mock.MagicMock()
+		testdb.conn.cursor = cursor_mock
+
+		testdb.update_result(None)
+		
+		assert not cursor_mock.called
+
+	def test_update_result_no_vtresponse_not_infected(self, testdb):
+		testdb.conn = mock.MagicMock()
+		cursor_mock = mock.MagicMock()
+		testdb.conn.cursor = cursor_mock
+		
+		testdb.update_result(DummyVTResult(False))
+		assert not cursor_mock.called
+	
+	def test_update_result_nothing_to_update(self, testdb):
+		testdb.conn = mock.MagicMock()
+		cursor_mock = mock.MagicMock()
+		testdb.conn.cursor = cursor_mock
+		
+		testdb.update_result(DummyVTResult(True))
+		assert cursor_mock.called
+		self.validate_filenames_in_database(testdb, [])
+
+	def test_update_result_update_filename(self, testdb, frozen_datetime):
+		testdb.add_resource(DummyResource('file1'))
+
+		testdb.update_result(DummyVTResult(True))
+		#  filename, pattern, infected, timestamp, sha256
+		self.validate_filenames_in_database(testdb, [
+			('file1', None, 1, FAKE_TIME_S, 'sha256'),
 		])
