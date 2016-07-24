@@ -5,7 +5,7 @@ import logging
 import os
 import re
 
-from amavisvt.client import AmavisVT
+from amavisvt.client import AmavisVT, Resource
 from amavisvt.config import Configuration
 
 logger = logging.getLogger(__file__)
@@ -44,6 +44,8 @@ class ThreadedRequestHandler(socketserver.BaseRequestHandler):
 				self.do_ping()
 			elif command == "CONTSCAN":
 				self.do_contscan(argument)
+			elif command == "REPORT":
+				self.do_report(argument)
 			else:
 				self.send_response("ERROR: Unknown command '%s'" % command)
 		except:
@@ -90,6 +92,16 @@ class ThreadedRequestHandler(socketserver.BaseRequestHandler):
 				else:
 					responses.append("%s: Clean" % resource)
 		self.request.sendall('\n'.join(responses))
+
+	def do_report(self, filename):
+		if not (os.path.exists(filename) and os.path.isfile(filename) and os.access(filename, os.R_OK)):
+			logger.error("File does not exist or is inaccessible: '%s'", filename)
+			self.send_response("ERROR: File does not exist or is inaccessible: '%s'" % filename)
+			return
+		
+		avt = AmavisVT(self.config)
+		result = avt.report_to_vt(Resource(filename, cleanup=False, no_unpack=True))
+		self.send_response(str(result) if result else "No response")
 
 
 class ThreadedUnixSocketServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):

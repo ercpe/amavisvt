@@ -520,6 +520,7 @@ class AmavisVT(object):
 
 			vtr = VTResponse(response.json())
 			logger.info("Report result: %s", vtr)
+			return vtr
 		except:
 			logger.exception("Error reporting %s to virustotal", resource)
 

@@ -43,7 +43,7 @@ if __name__ == "__main__":
 	parser.add_argument('-v', '--verbose', action='count', help='Increase verbosity', default=2)
 	parser.add_argument('-d', '--debug', action='store_true', default=False, help='Send verbose log messages to stdout too')
 	parser.add_argument('-s', '--socket', help='Socket path')
-	parser.add_argument('command')
+	parser.add_argument('command', choices=('ping', 'scan', 'report'))
 	parser.add_argument('command_args', nargs='*')
 	
 	args = parser.parse_args()
@@ -58,10 +58,6 @@ if __name__ == "__main__":
 	if not args.debug:
 		for h in logger.handlers:
 			h.setLevel(logging.ERROR)
-
-	if not args.command.lower() in ('ping', 'scan', 'report'):
-		print("Invalid command: %s" % args.command)
-		sys.exit(1)
 
 	error = False
 	try:
