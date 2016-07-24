@@ -131,7 +131,7 @@ class TestRequestHandler(object):
 		
 		assert avt.called
 		run_mock.assert_called_with('/')
-		request_mock.sendall.assert_called_with('')
+		request_mock.sendall.assert_called_with('AmavisVTd scan results:')
 	
 	@mock.patch('amavisvt.daemon.AmavisVT')
 	def test_contscan_command_response(self, avt):
@@ -164,11 +164,12 @@ class TestRequestHandler(object):
 		call_args, call_kwargs =  request_mock.sendall.call_args
 		assert len(call_args) == 1
 		lines = call_args[0].split('\n')
-		assert len(lines) == 4
-		assert lines[0] == 'test.zip: Clean'
-		assert lines[1] == 'other.zip: Not scanned by virustotal'
-		assert lines[2] == 'broken.zip: Error (broken)'
-		assert lines[3].startswith('infected.zip: Detected as ')
+		assert len(lines) == 5
+		assert lines[0] == "AmavisVTd scan results:"
+		assert lines[1] == 'test.zip: Clean'
+		assert lines[2] == 'other.zip: Not scanned by virustotal'
+		assert lines[3] == 'broken.zip: Error (broken)'
+		assert lines[4].startswith('infected.zip: Detected as ')
 	
 	@mock.patch('amavisvt.daemon.AmavisVT')
 	def test_report_command_invalid_argument(self, avt):
