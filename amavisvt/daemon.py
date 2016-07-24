@@ -79,7 +79,7 @@ class ThreadedRequestHandler(socketserver.BaseRequestHandler):
 			self.send_response("ERROR: Wrong argument '%s'" % directory)
 			return
 		
-		responses = []
+		responses = ["AmavisVTd scan results:"]
 		avt = AmavisVT(self.config)
 		for resource, scan_result in avt.run(directory):
 			if scan_result is None:
