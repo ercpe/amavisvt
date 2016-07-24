@@ -5,7 +5,7 @@ import os
 
 try:
 	from ConfigParser import SafeConfigParser as ConfigParser
-except ImportError:
+except ImportError:  # pragma: no cover
 	from configparser import ConfigParser
 
 logger = logging.getLogger(__name__)

@@ -59,6 +59,10 @@ if __name__ == "__main__":
 		for h in logger.handlers:
 			h.setLevel(logging.ERROR)
 
+	if not args.command.lower() in ('ping', 'scan', 'report'):
+		print("Invalid command: %s" % args.command)
+		sys.exit(1)
+
 	error = False
 	try:
 		client = AmavisVTClient(args.socket)

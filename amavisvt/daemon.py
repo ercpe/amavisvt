@@ -12,7 +12,7 @@ logger = logging.getLogger(__file__)
 
 try:
 	import SocketServer as socketserver
-except ImportError:
+except ImportError:  # pragma: no cover
 	import socketserver
 
 BUFFER_SIZE = 4096
@@ -20,7 +20,7 @@ BUFFER_SIZE = 4096
 
 class ThreadedRequestHandler(socketserver.BaseRequestHandler):
 
-	def __init__(self, *args, **kwargs):
+	def __init__(self, *args, **kwargs): # pragma: no cover
 		self.config = Configuration()
 		socketserver.BaseRequestHandler.__init__(self, *args, **kwargs)
 
