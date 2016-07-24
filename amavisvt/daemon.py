@@ -39,12 +39,16 @@ class ThreadedRequestHandler(socketserver.BaseRequestHandler):
 		if command:
 			logger.info("Dispatching '%s' command", command)
 
-		if command == "PING":
-			self.do_ping()
-		elif command == "CONTSCAN":
-			self.do_contscan(argument)
-		else:
-			self.send_response("ERROR: Unknown command '%s'" % command)
+		try:
+			if command == "PING":
+				self.do_ping()
+			elif command == "CONTSCAN":
+				self.do_contscan(argument)
+			else:
+				self.send_response("ERROR: Unknown command '%s'" % command)
+		except:
+			logger.exception("Command '%s' with arguments %s failed", command, argument)
+			self.send_response('ERROR: Command error')
 
 	def parse_command(self, data):
 		data = data or ""
@@ -143,4 +147,5 @@ class AmavisVTDaemon(object):
 			logger.info("Shutting down")
 			self.server.shutdown()
 			self.server.server_close()
-			os.remove(self.socket_path)
+			if os.path.exists(self.socket_path):
+				os.remove(self.socket_path)
