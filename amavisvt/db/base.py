@@ -4,14 +4,6 @@ class BaseDatabase(object):  # pragma: no cover
 
 	def __init__(self, config):
 		self.config = config
-		self.conn = None
-		self.connect()
-
-	def connect(self):
-		raise NotImplementedError
-
-	def close(self):
-		raise NotImplementedError
 
 	def add_resource(self, resource, vtresult=None, localpart=None, domain=None):
 		raise NotImplementedError
@@ -38,11 +30,6 @@ class BaseDatabase(object):  # pragma: no cover
 		raise NotImplementedError
 
 class NoopDatabase(BaseDatabase):  # pragma: no cover
-	def connect(self):
-		pass
-
-	def close(self):
-		pass
 
 	def add_resource(self, resource, vtresult=None, localpart=None, domain=None):
 		pass
