@@ -46,7 +46,9 @@ class AutoDB(object):
 
 	def __exit__(self, exc_type, exc_val, exc_tb):
 		stopped = time.time()
-		logger.debug("Disconnecting database. Time in manager: %.2fs, connected: %.2fs.", stopped - self._entered, stopped - self._connected)
+		logger.debug("Disconnecting database. Time in manager: %.2fs, connected: %.2fs.",
+					 (stopped - self._entered) if self._connected else None,
+					 (stopped - self._connected) if self._connected else None)
 		if self._conn:
 			try:
 				self._conn.close()
@@ -183,18 +185,22 @@ class AmavisVTDatabase(BaseDatabase):
 		update_sql = 'UPDATE filenames SET pattern=? WHERE id=?'
 		other_filename_localparts = self.get_filename_localparts()
 
+		update_data = []
 		for id, filename, localpart in result:
 			pattern = patterns.calculate(filename, other_filename_localparts, localpart=localpart)
 			if pattern:
+				update_data.append((pattern, id))
+				
+		with AutoDB(self.config.database_path) as db:
+			for pattern, id in update_data:
 				logger.debug("Updating pattern for %s to %s", filename, pattern)
-				with AutoDB(self.config.database_path) as db:
-					cursor = db.connection.cursor()
-					cursor.execute(update_sql, (
-						pattern,
-						id
-					))
-					db.connection.commit()
-					cursor.close()
+				cursor = db.connection.cursor()
+				cursor.execute(update_sql, (
+					pattern,
+					id
+				))
+				db.connection.commit()
+				cursor.close()
 
 	def clean(self):
 		min_date = datetime.datetime.now() - datetime.timedelta(days=90)
