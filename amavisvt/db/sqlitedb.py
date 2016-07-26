@@ -64,7 +64,7 @@ class AutoDB(object):
 	def connect(self):
 		logger.debug("Connecting to database")
 		self._connected = time.time()
-		conn = sqlite3.connect(self.database_path, timeout=20.0)
+		conn = sqlite3.connect(self.database_path, timeout=30.0)
 		conn.text_factory = str
 		return conn
 
@@ -154,6 +154,7 @@ class AmavisVTDatabase(BaseDatabase):
 			cursor.close()
 
 	def get_filenames(self):
+		logger.debug("Loading filenames from database")
 		with AutoDB(self.config.database_path) as db:
 			cursor = db.connection.cursor()
 			cursor.execute('SELECT DISTINCT filename FROM filenames')
@@ -163,6 +164,7 @@ class AmavisVTDatabase(BaseDatabase):
 			return l
 
 	def get_filename_localparts(self):
+		logger.debug("Loading filename and localparts")
 		with AutoDB(self.config.database_path) as db:
 			cursor = db.connection.cursor()
 			cursor.execute('SELECT DISTINCT filename, localpart FROM filenames')
