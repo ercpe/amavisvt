@@ -18,7 +18,7 @@ try:
 except ImportError:
 	Database = NoopDatabase
 
-is_real_database = pytest.mark.skipif(Database == NoopDatabase, reason='sqlite or fuzzywuzzy not available')
+is_real_database = pytest.mark.skipif(Database == NoopDatabase, reason='sqlite or python-levenshtein not available')
 
 TEST_DB_PATH = tempfile.mkstemp('testdb', 'amavisvt-tests-')[1]
 

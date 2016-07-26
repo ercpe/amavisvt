@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
-from fuzzywuzzy import fuzz
 import re
+import Levenshtein
 
 SPLIT_CHARS = r'[_\-\.\s]'
 chunk_split_re = re.compile(SPLIT_CHARS, re.IGNORECASE | re.UNICODE)
@@ -71,15 +71,15 @@ def calculate(filename, choices, localpart=None):
 		if len(other_chunks) <= MIN_CHUNKS or len(chunks) != len(other_chunks):
 			continue
 
-		ratios = [fuzz.ratio(chunks[i], other_chunks[i]) for i in range(0, len(chunks))]
+		ratios = [Levenshtein.ratio(chunks[i], other_chunks[i]) for i in range(0, len(chunks))]
 
 		# skip if more than one chunk differs
-		if len(list(filter(lambda x: x != 100, ratios))) > 1:
+		if len(list(filter(lambda x: x != 1.0, ratios))) > 1:
 			continue
 
 		def _build_pattern():
 			for i in range(0, len(chunks)):
-				if ratios[i] == 100:
+				if ratios[i] == 1.0:
 					yield chunks[i]
 				else:
 					if len(chunks[i]) > 2:
