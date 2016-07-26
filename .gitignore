@@ -72,3 +72,5 @@ target/
 .idea
 
 testresults.xml
+test.py
+test-all.sh
