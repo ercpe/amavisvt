@@ -74,3 +74,4 @@ target/
 testresults.xml
 test.py
 test-all.sh
+*.sqlite3
