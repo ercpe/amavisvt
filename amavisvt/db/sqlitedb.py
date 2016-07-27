@@ -47,8 +47,8 @@ class AutoDB(object):
 	def __exit__(self, exc_type, exc_val, exc_tb):
 		stopped = time.time()
 		logger.debug("Disconnecting database. Time in manager: %.2fs, connected: %.2fs.",
-					 (stopped - self._entered) if self._connected else None,
-					 (stopped - self._connected) if self._connected else None)
+						(stopped - self._entered) if self._connected else 0,
+						(stopped - self._connected) if self._connected else 0)
 		if self._conn:
 			try:
 				self._conn.close()
