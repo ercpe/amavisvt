@@ -169,14 +169,17 @@ class TestAmavisVTDatabase(object):
 		
 		with DBConnAndCursor() as (conn, cursor):
 			cursor.execute("INSERT INTO filenames (filename, pattern, infected, timestamp, sha256) VALUES ('foo', 'bar', 0, 0, 'baz')")
+			# too old and not pattern
+			cursor.execute(
+				"INSERT INTO filenames (filename, pattern, infected, timestamp, sha256) VALUES ('bar', NULL, 0, 0, 'bar')")
 			conn.commit()
 			
-			assert cursor.execute('SELECT COUNT(*) FROM filenames').fetchone()[0] == 1
+			assert cursor.execute('SELECT COUNT(*) FROM filenames').fetchone()[0] == 2
 
 		testdb.clean()
 		
 		with DBConnAndCursor() as (conn, cursor):
-			assert cursor.execute('SELECT COUNT(*) FROM filenames').fetchone()[0] == 0
+			assert cursor.execute('SELECT COUNT(*) FROM filenames').fetchone()[0] == 1
 
 	def test_filename_pattern_match_no_pattern(self, testdb):
 		assert not testdb.filename_pattern_match(None)

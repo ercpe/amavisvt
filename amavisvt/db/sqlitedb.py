@@ -206,8 +206,8 @@ class AmavisVTDatabase(BaseDatabase):
 				cursor.close()
 
 	def clean(self):
-		min_date = datetime.datetime.now() - datetime.timedelta(days=90)
-		sql = 'DELETE FROM filenames WHERE timestamp <= ?'
+		min_date = datetime.datetime.now() - datetime.timedelta(days=21)
+		sql = 'DELETE FROM filenames WHERE timestamp <= ? AND (pattern IS NULL AND infected=0)'
 
 		with AutoDB(self.config.database_path) as db:
 			cursor = db.connection.cursor()
