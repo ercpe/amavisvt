@@ -258,11 +258,11 @@ class TestAmavisVTDatabase(object):
 
 	def test_update_patterns(self, testdb):
 		with DBConnAndCursor() as (conn, cursor):
-			sql = "INSERT INTO filenames (filename, pattern, infected, timestamp, sha256) VALUES (?, ?, ?, ?, ?)"
+			sql = "INSERT INTO filenames (filename, pattern, infected, timestamp, sha256) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)"
 			data = [
-				(u'foo-bar-111.zip', None, 1, 0, u'foo-bar-1'),
-				(u'foo-bar-222.zip', None, 1, 0, u'foo-bar-2'),
-				(u'foo-bar-333.zip', None, 1, 0, u'foo-bar-3'),
+				(u'foo-bar-111.zip', None, 1, u'foo-bar-1'),
+				(u'foo-bar-222.zip', None, 1, u'foo-bar-2'),
+				(u'foo-bar-333.zip', None, 1, u'foo-bar-3'),
 			]
 			cursor.executemany(sql, data)
 			conn.commit()
@@ -270,10 +270,10 @@ class TestAmavisVTDatabase(object):
 		testdb.update_patterns()
 
 		with DBConnAndCursor() as (conn, cursor):
-			cursor.execute("SELECT filename, pattern, infected, timestamp, sha256 FROM filenames")
+			cursor.execute("SELECT filename, pattern, infected, sha256 FROM filenames")
 			result = sorted(cursor.fetchall())
 
-			new_data = [(f, 'foo-bar-[RANDOM]-zip', i, t, s) for f, _, i, t, s in data]
+			new_data = [(f, 'foo-bar-[RANDOM]-zip', i, s) for f, _, i, s in data]
 			assert result == new_data
 
 	def validate_filenames_in_database(self, testdb, data):

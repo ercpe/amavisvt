@@ -175,11 +175,12 @@ class AmavisVTDatabase(BaseDatabase):
 
 	def update_patterns(self):
 		logger.info("Updating patterns")
-		sql = 'SELECT id, filename, localpart FROM filenames WHERE pattern IS NULL'
+		min_date = datetime.datetime.now() - datetime.timedelta(days=14)
+		sql = 'SELECT id, filename, localpart FROM filenames WHERE pattern IS NULL AND timestamp >= ?'
 
 		with AutoDB(self.config.database_path) as db:
 			cursor = db.connection.cursor()
-			cursor.execute(sql)
+			cursor.execute(sql, (min_date, ))
 			result = cursor.fetchall()
 			db.connection.commit()
 			cursor.close()
