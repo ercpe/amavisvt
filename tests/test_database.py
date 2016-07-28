@@ -118,25 +118,25 @@ class TestAmavisVTDatabase(object):
 		db = Database(config=AmavisVTConfigurationParser({
 			'database-path': str(tmpdir + '/database.sqlite3')
 		}, path='/dev/null'))
-		assert db.schema_version == 2
+		assert db.schema_version == 3
 
 	def test_schema_migration(self, testdb):
-		assert testdb.schema_version == 2
+		assert testdb.schema_version == 3
 
 		with DBConnAndCursor() as (conn, cursor):
 			assert cursor.execute('SELECT version FROM schema_version').fetchone()[0] == testdb.schema_version
 
 	def test_schema_migration_already_migrated(self, testdb):
-		assert testdb.schema_version == 2
+		assert testdb.schema_version == 3
 		
 		with DBConnAndCursor() as (conn, cursor):
 			assert cursor.execute('SELECT version FROM schema_version').fetchone()[0] == testdb.schema_version
 
 		testdb.check_schema()
-		assert testdb.schema_version == 2
+		assert testdb.schema_version == 3
 
 	def test_get_filenames(self, testdb):
-		assert testdb.schema_version == 2
+		assert testdb.schema_version == 3
 		
 		with DBConnAndCursor() as (conn, cursor):
 			cursor.execute("INSERT INTO filenames (filename, pattern, infected, timestamp, sha256) VALUES ('foo', 'foo', 0, 0, 'foo')")
@@ -147,7 +147,7 @@ class TestAmavisVTDatabase(object):
 		assert sorted(testdb.get_filenames()) == ['bar', 'baz', 'foo']
 
 	def test_get_filenames_localpart(self, testdb):
-		assert testdb.schema_version == 2
+		assert testdb.schema_version == 3
 		
 		with DBConnAndCursor() as (conn, cursor):
 			cursor.execute(
@@ -165,7 +165,7 @@ class TestAmavisVTDatabase(object):
 		]
 
 	def test_clean(self, testdb):
-		assert testdb.schema_version == 2
+		assert testdb.schema_version == 3
 		
 		with DBConnAndCursor() as (conn, cursor):
 			cursor.execute("INSERT INTO filenames (filename, pattern, infected, timestamp, sha256) VALUES ('foo', 'bar', 0, 0, 'baz')")
@@ -261,7 +261,7 @@ class TestAmavisVTDatabase(object):
 
 	def test_update_patterns(self, testdb):
 		with DBConnAndCursor() as (conn, cursor):
-			sql = "INSERT INTO filenames (filename, pattern, infected, timestamp, sha256) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)"
+			sql = "INSERT INTO filenames (filename, pattern, infected, timestamp, sha256, chunks) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, 4)"
 			data = [
 				(u'foo-bar-111.zip', None, 1, u'foo-bar-1'),
 				(u'foo-bar-222.zip', None, 1, u'foo-bar-2'),
@@ -346,13 +346,13 @@ class TestAmavisVTDatabase(object):
 	# 	self.validate_filenames_in_database(testdb, [])
 
 	def test_update_result_update_filename(self, testdb, frozen_datetime):
-		testdb.add_resource(DummyResource('file1'))
+		testdb.add_resource(DummyResource('file1-foo.bar.zip'), localpart='foobar')
 
 		testdb.update_result(DummyVTResult(True))
 		
 		#  filename, pattern, infected, timestamp, sha256
 		self.validate_filenames_in_database(testdb, [
-			('file1', None, 1, FAKE_TIME_S, 'sha256'),
+			('file1-foo.bar.zip', None, 1, FAKE_TIME_S, 'sha256'),
 		])
 
 	def test_get_clean_hashes(self, testdb):

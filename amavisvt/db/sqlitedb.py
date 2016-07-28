@@ -10,7 +10,7 @@ from amavisvt.db.base import BaseDatabase
 
 logger = logging.getLogger(__name__)
 
-LATEST_SCHEMA_VERSION = 2
+LATEST_SCHEMA_VERSION = 3
 
 MIGRATIONS = (
 	(), # version 0
@@ -30,6 +30,9 @@ MIGRATIONS = (
 		"ALTER TABLE filenames ADD COLUMN localpart TEXT",
 		"ALTER TABLE filenames ADD COLUMN domain TEXT",
 	),
+	(  # version 3
+		"ALTER TABLE filenames ADD COLUMN chunks INTEGER DEFAULT NULL",
+	)
 )
 
 class AutoDB(object):
@@ -89,27 +92,59 @@ class AmavisVTDatabase(BaseDatabase):
 				logger.debug("Schema version: %s", schema_version)
 			except sqlite3.OperationalError:
 				logger.info("Database not set up yet")
-	
+		
+		self.schema_version = schema_version
 		if schema_version < LATEST_SCHEMA_VERSION:
 			self.migrate_schema(schema_version)
-		else:
-			self.schema_version = schema_version
 
 	def migrate_schema(self, current_schema_version):
 		with AutoDB(self.config.database_path) as db:
 			for version in range(current_schema_version + 1, LATEST_SCHEMA_VERSION + 1):
-				logger.info("Applying schema migrations for version %s" % version)
-	
-				for sql in MIGRATIONS[version]:
-					logger.debug("Applying sql: %s", sql)
-	
-					cursor = db.connection.cursor()
-					cursor.execute(sql)
-					db.connection.commit()
-					cursor.close()
-
+				self.apply_migration(db, self.schema_version, version)
 				self.set_schema_version(version)
 
+	def apply_migration(self, db, old_version, new_version):
+		logger.info("Applying schema migrations for version %s", new_version)
+		
+		for sql in MIGRATIONS[new_version]:
+			logger.debug("Applying sql: %s", sql)
+			
+			cursor = db.connection.cursor()
+			cursor.execute(sql)
+			db.connection.commit()
+			cursor.close()
+		
+		if old_version == 2 and new_version == 3:
+			self.migration_v2_to_v3()
+
+	def migration_v2_to_v3(self):
+		logger.info("Updating chunks column in filenames table (v2 to v3 migration)")
+		with AutoDB(self.config.database_path) as db:
+			sql = "SELECT id, filename, localpart FROM filenames WHERE chunks IS NULL"
+	
+			cursor = None
+			l = []
+			try:
+				cursor = db.connection.cursor()
+				cursor.execute(sql)
+				l = list(cursor.fetchall())
+				
+				logger.info("Updating %s filename entries", len(l))
+				data = (
+					(patterns.split_chunks(filename, localpart), _id) for _id, filename, localpart in l
+				)
+
+				cursor.executemany("UPDATE filenames SET chunks=? WHERE id=?", [
+					(len(pattern), _id) for pattern, _id in data if pattern
+				])
+				db.connection.commit()
+				
+			finally:
+				db.connection.commit()
+				cursor.close()
+				
+		self.clean()
+	
 	def set_schema_version(self, version):
 		with AutoDB(self.config.database_path) as db:
 			logger.info("Setting database schema version to %s", version)
@@ -121,11 +156,12 @@ class AmavisVTDatabase(BaseDatabase):
 
 	def add_resource(self, resource, vtresult=None, localpart=None, domain=None):
 		logger.debug("Adding resource %s with result %s and to (%s, %s) to database", resource, vtresult, localpart, domain)
-		insert_sql = 'INSERT INTO filenames (filename, pattern, infected, "timestamp", sha256, localpart, domain) VALUES (?, ?, ?, ?, ?, ?, ?)'
+		insert_sql = 'INSERT INTO filenames (filename, pattern, infected, "timestamp", sha256, localpart, domain, chunks) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
 		update_sql = 'UPDATE filenames SET pattern = ?, timestamp = ? WHERE filename=?'
 
-		pattern = patterns.calculate(resource.filename, self.get_filename_localparts(), localpart=localpart)
 		infected = vtresult.infected if vtresult else False
+		pattern = patterns.calculate(resource.filename, self.get_filename_localparts(), localpart=localpart)
+		no_chunks = len(patterns.split_chunks(pattern, localpart)) if pattern else 0
 
 		values = (
 			resource.filename,
@@ -134,7 +170,8 @@ class AmavisVTDatabase(BaseDatabase):
 			datetime.datetime.utcnow(),
 			resource.sha256,
 			localpart,
-			domain
+			domain,
+			no_chunks
 		)
 		
 		with AutoDB(self.config.database_path) as db:
@@ -176,42 +213,39 @@ class AmavisVTDatabase(BaseDatabase):
 	def update_patterns(self):
 		logger.info("Updating patterns")
 		min_date = datetime.datetime.now() - datetime.timedelta(days=14)
-		sql = 'SELECT id, filename, localpart FROM filenames WHERE pattern IS NULL AND timestamp >= ?'
+		sql = 'SELECT id, filename, localpart FROM filenames WHERE pattern IS NULL AND timestamp >= ? AND chunks >= ?'
 
 		with AutoDB(self.config.database_path) as db:
 			cursor = db.connection.cursor()
-			cursor.execute(sql, (min_date, ))
+			cursor.execute(sql, (min_date, patterns.MIN_CHUNKS))
 			result = cursor.fetchall()
+			logger.debug("%s filenames without pattern", len(result))
 			db.connection.commit()
 			cursor.close()
 
-		update_sql = 'UPDATE filenames SET pattern=? WHERE id=?'
+		update_sql = 'UPDATE filenames SET pattern=?, chunks=? WHERE id=?'
 		other_filename_localparts = self.get_filename_localparts()
 
-		update_data = []
-		for id, filename, localpart in result:
-			pattern = patterns.calculate(filename, other_filename_localparts, localpart=localpart)
-			if pattern:
-				update_data.append((pattern, id))
+		update_data = (
+			(patterns.calculate(filename, other_filename_localparts, localpart=localpart), id)
+			for id, filename, localpart in result
+		)
 				
 		with AutoDB(self.config.database_path) as db:
-			for pattern, id in update_data:
-				logger.debug("Updating pattern for %s to %s", filename, pattern)
-				cursor = db.connection.cursor()
-				cursor.execute(update_sql, (
-					pattern,
-					id
-				))
-				db.connection.commit()
-				cursor.close()
+			cursor = db.connection.cursor()
+			cursor.executemany(update_sql, [
+				(pattern, len(pattern), id) for pattern, id in update_data if pattern
+			])
+			db.connection.commit()
+			cursor.close()
 
 	def clean(self):
 		min_date = datetime.datetime.now() - datetime.timedelta(days=21)
-		sql = 'DELETE FROM filenames WHERE timestamp <= ? AND (pattern IS NULL AND infected=0)'
+		sql = 'DELETE FROM filenames WHERE (timestamp <= ? AND (pattern IS NULL AND infected=0)) or chunks < ?'
 
 		with AutoDB(self.config.database_path) as db:
 			cursor = db.connection.cursor()
-			cursor.execute(sql, (min_date, ))
+			cursor.execute(sql, (min_date, patterns.MIN_CHUNKS))
 			db.connection.commit()
 			cursor.close()
 
