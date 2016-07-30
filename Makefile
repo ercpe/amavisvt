@@ -24,8 +24,11 @@ compile_optimized:
 coverage:
 	coverage erase
 	PYTHONPATH="." coverage run --source='amavisvt' --branch -m py.test -qq tests/
-	coverage xml
+	coverage xml -i
 	coverage report -m
+
+sonar:
+ 	/usr/local/bin/sonar-scanner/bin/sonar-scanner -Dsonar.projectVersion=$(grep -Po '"(.*)"' amavisvt/__init__.py | sed -e 's/"//g')
 
 clean:
 	find -name "*.py?" -delete
@@ -34,4 +37,4 @@ clean:
 	rm -fr htmlcov dist amavisvt.egg-info
 
 travis: compile compile_optimized test_default_python coverage
-jenkins: travis
+jenkins: travis sonar
