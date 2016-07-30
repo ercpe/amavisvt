@@ -1,5 +1,7 @@
 TARGET?=tests
 
+VERSION := $(shell grep -Po '"(.*)"' amavisvt/__init__.py | sed -e 's/"//g')
+
 test_default_python:
 	PYTHONPATH="." python -m pytest tests/ --junit-xml testresults.xml -rxsw -v
 
@@ -28,7 +30,7 @@ coverage:
 	coverage report -m
 
 sonar:
- 	/usr/local/bin/sonar-scanner/bin/sonar-scanner -Dsonar.projectVersion=$(grep -Po '"(.*)"' amavisvt/__init__.py | sed -e 's/"//g')
+	/usr/local/bin/sonar-scanner/bin/sonar-scanner -Dsonar.projectVersion=$(VERSION)
 
 clean:
 	find -name "*.py?" -delete
