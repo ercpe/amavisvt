@@ -5,8 +5,8 @@ import Levenshtein
 
 SPLIT_CHARS = r'[_\-\.\s]'
 chunk_split_re = re.compile(SPLIT_CHARS, re.IGNORECASE | re.UNICODE)
-start_clean_re = re.compile(r'^(' + SPLIT_CHARS + r'+)', re.IGNORECASE|re.UNICODE)
-end_clean_re = re.compile(r'(' + SPLIT_CHARS + r'+)$', re.IGNORECASE|re.UNICODE)
+start_clean_re = re.compile(r'^(' + SPLIT_CHARS + r'+)', re.IGNORECASE | re.UNICODE)
+end_clean_re = re.compile(r'(' + SPLIT_CHARS + r'+)$', re.IGNORECASE | re.UNICODE)
 
 chunk_re = re.compile(r'[_\-\.]', re.IGNORECASE | re.UNICODE)
 

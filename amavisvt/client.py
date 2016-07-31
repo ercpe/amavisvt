@@ -15,13 +15,13 @@ import tempfile
 
 import shutil
 
-MAIL_MIME_TYPE = 'message/rfc822'
-
-logger = logging.getLogger(__name__)
-
 from amavisvt import VERSION
 from amavisvt.db import Database
 from amavisvt.db.base import NoopDatabase
+
+MAIL_MIME_TYPE = 'message/rfc822'
+
+logger = logging.getLogger(__name__)
 
 BUFFER_SIZE = 4096
 
