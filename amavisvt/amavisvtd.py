@@ -3,10 +3,10 @@
 import threading
 import signal
 import logging
+import sys
 from argparse import ArgumentParser
 from logging.handlers import SysLogHandler
-
-import sys
+from setproctitle import setproctitle
 
 from amavisvt.daemon import AmavisVTDaemon
 
@@ -48,6 +48,7 @@ def main(args):
     return error
 
 if __name__ == "__main__":  # pragma: no cover
+    setproctitle("amavisvtd")
     parser = ArgumentParser()
     parser.add_argument('-v', '--verbose', action='count', help='Increase verbosity', default=2)
     parser.add_argument('-d', '--debug', action='store_true', default=False, help='Send verbose log messages to stdout too')
