@@ -298,41 +298,46 @@ class Resource(object):
             payload = msg.get_payload()
 
             if isinstance(payload, list):
-                for i, part in enumerate(payload):
-                    if not isinstance(part, email.message.Message):
-                        logging.debug("Skipping non-message payload")
-                        continue
-
-                    logger.debug("Mailpart %s", i)
-                    for k, v in part.items():
-                        logger.debug(" %s: %s", k, v)
-
-                    filename = part.get_filename()
-                    partname = "part%s" % i
-
-                    if not filename:
-                        continue
-
-                    try:
-                        partpayload = part.get_payload()
-                        if len(partpayload) > 27892121:  # roughly 20 MiB as base64
-                            logger.warning("Skipping part (larger than 20MiB")
-                        else:
-                            _, outpath = tempfile.mkstemp('-mailpart', prefix='amavisvt-')
-
-                            with open(outpath, 'wb') as o:
-                                o.write(base64.b64decode(partpayload))
-
-                            logger.debug("Mail part %s (%s): orig filename: %s, mime type: %s", i, outpath, filename, Resource(outpath).mime_type)
-
-                            yield Resource(outpath, filename=filename)
-                    except Exception as ex:
-                        logger.exception("Could not extract attachment %s: %s", partname, ex)
+                for part in self.unpack_mail_payload(payload):
+                    yield part
             else:
                 logger.debug("Skipping single payload message")
 
         except:
             logger.exception("Failed to parse mail file %s", self.path)
+
+    def unpack_mail_payload(self, payload):
+        for i, part in enumerate(payload):
+            if not isinstance(part, email.message.Message):
+                logging.debug("Skipping non-message payload")
+                continue
+        
+            logger.debug("Mailpart %s", i)
+            for k, v in part.items():
+                logger.debug(" %s: %s", k, v)
+        
+            filename = part.get_filename()
+            partname = "part%s" % i
+        
+            if not filename:
+                continue
+        
+            try:
+                partpayload = part.get_payload()
+                if len(partpayload) > 27892121:  # roughly 20 MiB as base64
+                    logger.warning("Skipping part (larger than 20MiB")
+                else:
+                    _, outpath = tempfile.mkstemp('-mailpart', prefix='amavisvt-')
+                
+                    with open(outpath, 'wb') as o:
+                        o.write(base64.b64decode(partpayload))
+                
+                    logger.debug("Mail part %s (%s): orig filename: %s, mime type: %s", i, outpath, filename,
+                                 Resource(outpath).mime_type)
+                
+                    yield Resource(outpath, filename=filename)
+            except Exception as ex:
+                logger.exception("Could not extract attachment %s: %s", partname, ex)
 
     def __str__(self):
         return self.filename
