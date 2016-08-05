@@ -270,18 +270,20 @@ class Resource(object):
                         logger.warning("Stopping examining zip entry at %s", i)
                         break
 
-                    _, t = tempfile.mkstemp('-zipentry', prefix='amavisvt-')
-                    logger.debug("Extracting entry %s to %s", zi.filename, t)
+                    fd, temp_path = tempfile.mkstemp('-zipentry', prefix='amavisvt-')
+                    logger.debug("Extracting entry %s to %s", zi.filename, temp_path)
                     try:
-                        with zf.open(zi, 'r') as fi, open(t, 'wb') as fo:
+                        with zf.open(zi, 'r') as fi:
                             tmp = fi.read(BUFFER_SIZE)
                             while tmp:
-                                fo.write(tmp)
+                                os.write(fd, tmp)
                                 tmp = fi.read(BUFFER_SIZE)
 
-                        yield Resource(t, filename=zi.filename)
+                        yield Resource(temp_path, filename=zi.filename)
                     except NotImplementedError as nie:
                         logger.info("Skipping %s: %s", zi, nie)
+                    finally:
+                        os.close(fd)
 
         except zipfile.error as e:
             logger.error("Error unpacking zip file %s: %s", self.path, e)
@@ -327,15 +329,16 @@ class Resource(object):
                 if len(partpayload) > 27892121:  # roughly 20 MiB as base64
                     logger.warning("Skipping part (larger than 20MiB")
                 else:
-                    _, outpath = tempfile.mkstemp('-mailpart', prefix='amavisvt-')
+                    fd, temp_path = tempfile.mkstemp('-mailpart', prefix='amavisvt-')
+                    try:
+                        os.write(fd, base64.b64decode(partpayload))
+                    finally:
+                        os.close(fd)
                 
-                    with open(outpath, 'wb') as o:
-                        o.write(base64.b64decode(partpayload))
+                    logger.debug("Mail part %s (%s): orig filename: %s, mime type: %s", i, temp_path, filename,
+                                 Resource(temp_path).mime_type)
                 
-                    logger.debug("Mail part %s (%s): orig filename: %s, mime type: %s", i, outpath, filename,
-                                 Resource(outpath).mime_type)
-                
-                    yield Resource(outpath, filename=filename)
+                    yield Resource(temp_path, filename=filename)
             except Exception as ex:
                 logger.exception("Could not extract attachment %s: %s", partname, ex)
 
