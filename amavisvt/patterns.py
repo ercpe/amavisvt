@@ -79,12 +79,9 @@ def calculate(filename, choices, localpart=None):
 
         def _build_pattern():
             for i in range(0, len(chunks)):
-                if ratios[i] == 1.0:
+                if ratios[i] == 1.0 or len(chunks[i]) <= 2:
                     yield chunks[i]
                 else:
-                    if len(chunks[i]) > 2:
-                        yield '[RANDOM]'
-                    else:
-                        yield chunks[i]
+                    yield '[RANDOM]'
 
         return '-'.join(list(_build_pattern()))
