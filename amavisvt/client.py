@@ -313,17 +313,17 @@ class Resource(object):
             if not isinstance(part, email.message.Message):
                 logging.debug("Skipping non-message payload")
                 continue
-        
+
             logger.debug("Mailpart %s", i)
             for k, v in part.items():
                 logger.debug(" %s: %s", k, v)
-        
+
             filename = part.get_filename()
             partname = "part%s" % i
-        
+
             if not filename:
                 continue
-        
+
             try:
                 partpayload = part.get_payload()
                 if len(partpayload) > 27892121:  # roughly 20 MiB as base64
@@ -334,10 +334,10 @@ class Resource(object):
                         os.write(fd, base64.b64decode(partpayload))
                     finally:
                         os.close(fd)
-                
+
                     logger.debug("Mail part %s (%s): orig filename: %s, mime type: %s", i, temp_path, filename,
                                  Resource(temp_path).mime_type)
-                
+
                     yield Resource(temp_path, filename=filename)
             except Exception as ex:
                 logger.exception("Could not extract attachment %s: %s", partname, ex)
@@ -372,10 +372,10 @@ class AmavisVT(object):
             for root, dirs, files in os.walk(file_or_directory):
                 for f in files:
                     p = os.path.join(root, f)
-                    
+
                     if not os.path.isfile(p):
                         continue
-                    
+
                     if os.access(p, os.R_OK):
                         resources.append(Resource(p, cleanup=False))
                     else:
@@ -435,7 +435,7 @@ class AmavisVT(object):
                             results.remove((resource, vtresult))
                         except ValueError:
                             pass
-                        
+
                         reported = False
 
                         if self.config.auto_report:

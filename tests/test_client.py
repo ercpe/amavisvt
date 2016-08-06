@@ -15,7 +15,7 @@ import pytest
 OPEN_PATCH = '__builtin__.open' if sys.version_info < (3,0,0) else 'builtins.open'
 
 class DummyResource(Resource):
-	
+
 	def __init__(self, filename=None, mime_type=None):
 		f = filename or "dummy"
 		super(DummyResource, self).__init__(path=f, filename=f)

@@ -40,11 +40,11 @@ def frozen_datetime(monkeypatch):
 
 
 class DBConnAndCursor(object):
-	
+
 	def __init__(self):
 		self._conn = None
 		self._cursor = None
-	
+
 	def __enter__(self):
 		self._conn = sqlite3.connect(TEST_DB_PATH, timeout=20.0)
 		self._conn.text_factory = str
@@ -104,7 +104,7 @@ class TestAmavisVTDatabase(object):
 
 	# def setup_method(self, method):
 	# 	print("setup_method")
-		
+
 	def teardown_method(self, method):
 		if os.path.exists(TEST_DB_PATH):
 			os.remove(TEST_DB_PATH)
@@ -128,7 +128,7 @@ class TestAmavisVTDatabase(object):
 
 	def test_schema_migration_already_migrated(self, testdb):
 		assert testdb.schema_version == 3
-		
+
 		with DBConnAndCursor() as (conn, cursor):
 			assert cursor.execute('SELECT version FROM schema_version').fetchone()[0] == testdb.schema_version
 
@@ -137,7 +137,7 @@ class TestAmavisVTDatabase(object):
 
 	def test_get_filenames(self, testdb):
 		assert testdb.schema_version == 3
-		
+
 		with DBConnAndCursor() as (conn, cursor):
 			cursor.execute("INSERT INTO filenames (filename, pattern, infected, timestamp, sha256) VALUES ('foo', 'foo', 0, 0, 'foo')")
 			cursor.execute("INSERT INTO filenames (filename, pattern, infected, timestamp, sha256) VALUES ('bar', 'bar', 0, 0, 'bar')")
@@ -148,7 +148,7 @@ class TestAmavisVTDatabase(object):
 
 	def test_get_filenames_localpart(self, testdb):
 		assert testdb.schema_version == 3
-		
+
 		with DBConnAndCursor() as (conn, cursor):
 			cursor.execute(
 				"INSERT INTO filenames (filename, pattern, infected, timestamp, sha256, localpart) VALUES ('foo', 'foo', 0, 0, 'foo', 'alice')")
@@ -166,18 +166,18 @@ class TestAmavisVTDatabase(object):
 
 	def test_clean(self, testdb):
 		assert testdb.schema_version == 3
-		
+
 		with DBConnAndCursor() as (conn, cursor):
 			cursor.execute("INSERT INTO filenames (filename, pattern, infected, timestamp, sha256) VALUES ('foo', 'bar', 0, 0, 'baz')")
 			# too old and not pattern
 			cursor.execute(
 				"INSERT INTO filenames (filename, pattern, infected, timestamp, sha256) VALUES ('bar', NULL, 0, 0, 'bar')")
 			conn.commit()
-			
+
 			assert cursor.execute('SELECT COUNT(*) FROM filenames').fetchone()[0] == 2
 
 		testdb.clean()
-		
+
 		with DBConnAndCursor() as (conn, cursor):
 			assert cursor.execute('SELECT COUNT(*) FROM filenames').fetchone()[0] == 1
 
@@ -236,7 +236,7 @@ class TestAmavisVTDatabase(object):
 			conn.commit()
 
 		testdb.update_patterns()
-		
+
 		with DBConnAndCursor() as (conn, cursor):
 			cursor.execute("SELECT filename, pattern, infected, timestamp, sha256 FROM filenames")
 			result = cursor.fetchall()
@@ -325,17 +325,17 @@ class TestAmavisVTDatabase(object):
 		testdb.conn.cursor = cursor_mock
 
 		testdb.update_result(None)
-		
+
 		assert not cursor_mock.called
 
 	def test_update_result_no_vtresponse_not_infected(self, testdb):
 		testdb.conn = mock.MagicMock()
 		cursor_mock = mock.MagicMock()
 		testdb.conn.cursor = cursor_mock
-		
+
 		testdb.update_result(DummyVTResult(False))
 		assert not cursor_mock.called
-	
+
 	# def test_update_result_nothing_to_update(self, testdb):
 	# 	testdb.conn = mock.MagicMock()
 	# 	cursor_mock = mock.MagicMock()
@@ -349,7 +349,7 @@ class TestAmavisVTDatabase(object):
 		testdb.add_resource(DummyResource('file1-foo.bar.zip'), localpart='foobar')
 
 		testdb.update_result(DummyVTResult(True))
-		
+
 		#  filename, pattern, infected, timestamp, sha256
 		self.validate_filenames_in_database(testdb, [
 			('file1-foo.bar.zip', None, 1, FAKE_TIME_S, 'sha256'),

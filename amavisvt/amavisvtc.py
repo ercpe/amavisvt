@@ -12,20 +12,20 @@ from amavisvt.config import Configuration
 BUFFER_SIZE = 4096
 
 class AmavisVTClient(object):
-    
+
     def __init__(self, socket_path):
         self.config = Configuration()
         self.socket_path = socket_path or self.config.socket_path
 
     def execute(self, command, *arguments):
         logger.debug("Executing command '%s' with args: %s", command, arguments)
-        
+
         translate = {
             'ping': 'PING',
             'scan': 'CONTSCAN',
             'report': 'REPORT',
         }
-        
+
         sock = None
         try:
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -52,16 +52,16 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--socket', help='Socket path')
     parser.add_argument('command', choices=('ping', 'scan', 'report'))
     parser.add_argument('command_args', nargs='*')
-    
+
     args = parser.parse_args()
-    
+
     logging.basicConfig(
         level=logging.FATAL - (10 * args.verbose),
         format='%(asctime)s %(levelname)-7s [%(threadName)s] %(message)s',
     )
-    
+
     logger = logging.getLogger()
-    
+
     if not args.debug:
         for h in logger.handlers:
             h.setLevel(logging.ERROR)

@@ -27,7 +27,7 @@ class ThreadedRequestHandler(socketserver.BaseRequestHandler):
     def handle(self):
         temp = self.request.recv(BUFFER_SIZE)
         data = temp
-        
+
         if '\n' not in data:
             logger.error("Invalid data received: '%s'" % data)
             self.send_response("ERROR: Invalid data: '%s'" % data)
@@ -78,7 +78,7 @@ class ThreadedRequestHandler(socketserver.BaseRequestHandler):
             logger.error("Cannot handle CONTSCAN command with argument '%s' (path does not exist)", directory)
             self.send_response("ERROR: Wrong argument '%s'" % directory)
             return
-        
+
         responses = ["AmavisVTd scan results:"]
         avt = AmavisVT(self.config)
         for resource, scan_result in avt.run(directory):
@@ -100,7 +100,7 @@ class ThreadedRequestHandler(socketserver.BaseRequestHandler):
             logger.error("File does not exist or is inaccessible: '%s'", filename)
             self.send_response("ERROR: File does not exist or is inaccessible: '%s'" % filename)
             return
-        
+
         avt = AmavisVT(self.config)
         result = avt.report_to_vt(Resource(filename, cleanup=False, no_unpack=True))
         self.send_response(str(result) if result else "No response")

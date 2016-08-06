@@ -36,13 +36,13 @@ MIGRATIONS = (
 )
 
 class AutoDB(object):
-    
+
     def __init__(self, database_path):
         self.database_path = database_path
         self._entered = None
         self._connected = None
         self._conn = None
-    
+
     def __enter__(self):
         self._entered = time.time()
         return self
@@ -57,13 +57,13 @@ class AutoDB(object):
                 self._conn.close()
             except:
                 logger.exception("Could not close database connection")
-    
+
     @property
     def connection(self):
         if not self._conn:
             self._conn = self.connect()
         return self._conn
-    
+
     def connect(self):
         logger.debug("Connecting to database")
         self._connected = time.time()
@@ -83,7 +83,7 @@ class AmavisVTDatabase(BaseDatabase):
 
         with AutoDB(self.config.database_path) as db:
             cursor = db.connection.cursor()
-    
+
             schema_version = 0
             try:
                 cursor.execute("SELECT version FROM schema_version")
@@ -92,7 +92,7 @@ class AmavisVTDatabase(BaseDatabase):
                 logger.debug("Schema version: %s", schema_version)
             except sqlite3.OperationalError:
                 logger.info("Database not set up yet")
-        
+
         self.schema_version = schema_version
         if schema_version < LATEST_SCHEMA_VERSION:
             self.migrate_schema(schema_version)
@@ -105,15 +105,15 @@ class AmavisVTDatabase(BaseDatabase):
 
     def apply_migration(self, db, old_version, new_version):
         logger.info("Applying schema migrations for version %s", new_version)
-        
+
         for sql in MIGRATIONS[new_version]:
             logger.debug("Applying sql: %s", sql)
-            
+
             cursor = db.connection.cursor()
             cursor.execute(sql)
             db.connection.commit()
             cursor.close()
-        
+
         if old_version == 2 and new_version == 3:
             self.migration_v2_to_v3()
 
@@ -121,14 +121,14 @@ class AmavisVTDatabase(BaseDatabase):
         logger.info("Updating chunks column in filenames table (v2 to v3 migration)")
         with AutoDB(self.config.database_path) as db:
             sql = "SELECT id, filename, localpart FROM filenames WHERE chunks IS NULL"
-    
+
             cursor = None
             l = []
             try:
                 cursor = db.connection.cursor()
                 cursor.execute(sql)
                 l = list(cursor.fetchall())
-                
+
                 logger.info("Updating %s filename entries", len(l))
                 data = (
                     (patterns.split_chunks(filename, localpart), _id) for _id, filename, localpart in l
@@ -138,13 +138,13 @@ class AmavisVTDatabase(BaseDatabase):
                     (len(pattern), _id) for pattern, _id in data if pattern
                 ])
                 db.connection.commit()
-                
+
             finally:
                 db.connection.commit()
                 cursor.close()
-                
+
         self.clean()
-    
+
     def set_schema_version(self, version):
         with AutoDB(self.config.database_path) as db:
             logger.info("Setting database schema version to %s", version)
@@ -173,7 +173,7 @@ class AmavisVTDatabase(BaseDatabase):
             domain,
             no_chunks
         )
-        
+
         with AutoDB(self.config.database_path) as db:
             cursor = None
             try:
@@ -184,7 +184,7 @@ class AmavisVTDatabase(BaseDatabase):
             finally:
                 db.connection.commit()
                 cursor.close()
-    
+
             cursor = db.connection.cursor()
             cursor.execute("UPDATE filenames SET infected=? WHERE sha256=? AND infected=0", (int(infected), resource.sha256))
             db.connection.commit()
@@ -230,7 +230,7 @@ class AmavisVTDatabase(BaseDatabase):
             (patterns.calculate(filename, other_filename_localparts, localpart=localpart), id)
             for id, filename, localpart in result
         )
-                
+
         with AutoDB(self.config.database_path) as db:
             cursor = db.connection.cursor()
             cursor.executemany(update_sql, [
