@@ -421,29 +421,7 @@ class AmavisVT(object):
 
             if self.config.filename_pattern_detection:
                 logger.debug("Filename pattern detection enabled")
-
-                for resource, sha256 in hashes_for_vt:
-                    vtresult = [r for _, r in vt_results if r and r.sha256 == sha256]
-                    vtresult = vtresult[0] if vtresult else None
-
-                    # add the resource to the database
-                    self.database.add_resource(resource, vtresult, resource_set.to_localpart, resource_set.to_domain)
-
-                    # only test for filename pattern if the resource hasn't identified as infected by its hash
-                    if vtresult is None and self.database.filename_pattern_match(resource, localpart=resource_set.to_localpart):
-                        logger.info("Flagging attachment %s as INFECTED (identified via filename pattern)", resource.filename)
-
-                        try:
-                            results.remove((resource, vtresult))
-                        except ValueError:
-                            pass
-
-                        reported = False
-
-                        if self.config.auto_report:
-                            reported = self.report_to_vt(resource)
-
-                        results.append((resource, FilenameResponse(reported)))
+                results.extend(self.do_filename_pattern_detection(hashes_for_vt, resource_set, vt_results))
 
             # update patterns for entries which have no pattern set yet
             self.database.update_patterns()
@@ -452,6 +430,32 @@ class AmavisVT(object):
         finally:
             clean_silent(self.clean_paths)
             self.database.clean()
+
+    def do_filename_pattern_detection(self, hashes_for_vt, resource_set, vt_results):
+        results = []
+        for resource, sha256 in hashes_for_vt:
+            vtresult = [r for _, r in vt_results if r and r.sha256 == sha256]
+            vtresult = vtresult[0] if vtresult else None
+
+            # add the resource to the database
+            self.database.add_resource(resource, vtresult, resource_set.to_localpart, resource_set.to_domain)
+
+            # only test for filename pattern if the resource hasn't identified as infected by its hash
+            if vtresult is None and self.database.filename_pattern_match(resource, localpart=resource_set.to_localpart):
+                logger.info("Flagging attachment %s as INFECTED (identified via filename pattern)", resource.filename)
+
+                try:
+                    results.remove((resource, vtresult))
+                except ValueError:
+                    pass
+
+                reported = False
+
+                if self.config.auto_report:
+                    reported = self.report_to_vt(resource)
+
+                results.append((resource, FilenameResponse(reported)))
+        return results
 
     @staticmethod
     def is_included(resource):

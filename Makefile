@@ -38,8 +38,5 @@ clean:
 	rm -f testresults.xml
 	rm -fr htmlcov dist amavisvt.egg-info
 
-fix:
-	find -name "*.py" -exec sed -i -r 's/^\s+$//g' {} +
-
 travis: compile compile_optimized test_default_python coverage
 jenkins: travis sonar
