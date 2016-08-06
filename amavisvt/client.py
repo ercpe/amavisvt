@@ -353,7 +353,7 @@ class AmavisVT(object):
 
     def __init__(self, config, memcached_servers=None):
         self.config = config
-        self.memcached = memcache.Client(memcached_servers or ['127.0.0.1:11211'])
+        self.memcached = memcache.Client(memcached_servers or ['127.0.0.1:11211']) # NOSONAR
         try:
             self.database = Database(config)
         except:
