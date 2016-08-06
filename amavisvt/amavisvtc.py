@@ -44,7 +44,7 @@ class AmavisVTClient(object):
                 sock.close()
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     setproctitle("amavisvtd")
     parser = ArgumentParser()
     parser.add_argument('-v', '--verbose', action='count', help='Increase verbosity', default=2)
