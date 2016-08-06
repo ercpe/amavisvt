@@ -129,7 +129,7 @@ class ResourceSet(object):
                 recipient = msg.get('To', '')
                 if recipient:
                     logger.info("TO header: '%s'", recipient)
-                    real_name, email_address = parseaddr(recipient)
+                    _, email_address = parseaddr(recipient)
                     if email_address:
                         l.append(email_address)
         except:
