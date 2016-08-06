@@ -120,7 +120,8 @@ class ResourceSet(object):
 
         self._to_addresses = list(set(addresses))
 
-    def extract_addresses(self, resource):
+    @staticmethod
+    def extract_addresses(resource):
         l = []
 
         try:
@@ -308,7 +309,8 @@ class Resource(object):
         except:
             logger.exception("Failed to parse mail file %s", self.path)
 
-    def unpack_mail_payload(self, payload):
+    @staticmethod
+    def unpack_mail_payload(payload):
         for i, part in enumerate(payload):
             if not isinstance(part, email.message.Message):
                 logging.debug("Skipping non-message payload")
@@ -451,7 +453,8 @@ class AmavisVT(object):
             clean_silent(self.clean_paths)
             self.database.clean()
 
-    def is_included(self, resource):
+    @staticmethod
+    def is_included(resource):
         return any((f(resource) for f in [
                     lambda r: r.mime_type.startswith('application/'),
                     lambda r: r.mime_type in ('text/x-shellscript', 'text/x-perl', 'text/x-ruby', 'text/x-python'),

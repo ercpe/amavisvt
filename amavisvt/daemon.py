@@ -52,7 +52,8 @@ class ThreadedRequestHandler(socketserver.BaseRequestHandler):
             logger.exception("Command '%s' with arguments %s failed", command, argument)
             self.send_response('ERROR: Command error')
 
-    def parse_command(self, data):
+    @staticmethod
+    def parse_command(data):
         data = data or ""
         if '\n' in data:
             s = data[:data.index('\n')]
@@ -137,7 +138,8 @@ class AmavisVTDaemon(object):
         except:
             self.stop()
 
-    def is_socket_working(self, socket_path):
+    @staticmethod
+    def is_socket_working(socket_path):
         """Tests whether the socket in socket_path is working by sending the PING command"""
         try:
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
