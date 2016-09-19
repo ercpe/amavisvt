@@ -34,6 +34,8 @@ As a last step, configure amavisd-new by adding the following snippet to either 
         qr/(?:Detected as) (.*)/m,
         qr/(?:Detected as) (.*)/m],
 
+If you feel adventurous, you can set `api_url` to https://hub.ercpe.de/vtcache/vtapi/v2/file/report which acts as a caching proxy for the Virustotal API and gives you a higher API limit.
+
 ## License
 
 See LICENSE.txt
