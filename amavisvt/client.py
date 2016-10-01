@@ -267,7 +267,10 @@ class Resource(object):
         try:
             with zipfile.ZipFile(self.path) as zf:
                 for i, zi in enumerate(zf.infolist()):
-                    if i > 1000:
+                    if i >= 50:
+                        # it would be great to scan all the files in a zip but i haven't seen a zip file with an infected
+                        # entry which has more than a few (2-3) entries in total. If you see such files regularly, let me
+                        # know and i make this configurable.
                         logger.warning("Stopping examining zip entry at %s", i)
                         break
 

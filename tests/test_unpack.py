@@ -66,6 +66,25 @@ class TestUnpack(object):
             if not x.path == r.path:
                 os.remove(x.path)
     
+    def test_unpack_zip_max_items(self):
+        path = self._resource('100files.zip')
+        r = Resource(path)
+        assert r.can_unpack
+        assert r.md5 == "d4de3fd21a1f52291c22898036ddad48"
+        assert r.sha1 == "49e955cce2b5e2a49f813a1ae3b589552d48eb36"
+        assert r.sha256 == "c98853d800a277a65360f90daa8d7b728958706e5a8ee22ff5f22b9b7f5d115c"
+        assert r.mime_type == "application/zip"
+        
+        resources = list(r.unpack())
+        assert len(resources) == 50
+        
+        assert all([not r.can_unpack for r in resources])
+        assert all([r.md5 == "d8e8fca2dc0f896fd7cb4cb0031ba249" for r in resources])
+        assert all([r.sha1 == "4e1243bd22c66e76c2ba9eddc1f91394e57f9f83" for r in resources])
+        assert all([r.sha256 == "f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2" for r in resources])
+        assert all([r.mime_type == "text/plain" for r in resources])
+        
+    
     def test_unpack_mail(self):
         path = self._resource('mail_with_attachment.eml')
         r = Resource(path)
