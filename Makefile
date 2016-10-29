@@ -34,9 +34,8 @@ sonar:
 
 clean:
 	find -name "*.py?" -delete
-	rm -f coverage.xml
-	rm -f testresults.xml
-	rm -fr htmlcov dist amavisvt.egg-info
+	rm -f coverage.xml testresults.xml .coverage
+	rm -fr htmlcov dist build .cache amavisvt.egg-info
 
 travis: compile compile_optimized test_default_python coverage
 jenkins: travis sonar
