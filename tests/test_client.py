@@ -75,9 +75,10 @@ class TestClientBasic(object):
             '.exe', '.com', '.bat', '.cmd', '.tar.gz', '.zip', '.tar.bz2', '.tar.7z', '.doc', '.docx', '.docm', '.xls',
             '.xlsa', '.xlsx', '.xlsm', '.ppt', '.ppta', '.pptx', '.pptm', '.pdf', '.js', '.rtf', '.ttf', '.htm',
             '.html',
-            '.vbs', '.wsf'
+            '.vbs', '.wsf',
+            ''
         ]:
-            assert avt.is_included(DummyResource('/tmp/foo%s' % ext))
+            assert avt.is_included(DummyResource('/tmp/foo%s' % ext)), "Extension '%s' should be included" % ext
     
     def test_is_included_by_mime_type(self):
         avt = AmavisVT(AmavisVTConfigurationParser())
