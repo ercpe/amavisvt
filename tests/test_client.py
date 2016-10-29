@@ -83,16 +83,16 @@ class TestClientBasic(object):
     def test_is_included_by_mime_type(self):
         avt = AmavisVT(AmavisVTConfigurationParser())
         
-        assert avt.is_included(DummyResource(mime_type='application/octect-stream'))
-        assert avt.is_included(DummyResource(mime_type='application/foobar'))
-        assert avt.is_included(DummyResource(mime_type='text/x-shellscript'))
-        assert avt.is_included(DummyResource(mime_type='text/x-perl'))
-        assert avt.is_included(DummyResource(mime_type='text/x-ruby'))
-        assert avt.is_included(DummyResource(mime_type='text/x-python'))
+        assert avt.is_included(DummyResource(filename='foo.bar', mime_type='application/octet-stream'))
+        assert avt.is_included(DummyResource(filename='foo.bar', mime_type='application/foobar'))
+        assert avt.is_included(DummyResource(filename='foo.bar', mime_type='text/x-shellscript'))
+        assert avt.is_included(DummyResource(filename='foo.bar', mime_type='text/x-perl'))
+        assert avt.is_included(DummyResource(filename='foo.bar', mime_type='text/x-ruby'))
+        assert avt.is_included(DummyResource(filename='foo.bar', mime_type='text/x-python'))
         
-        assert not avt.is_included(DummyResource(mime_type='text/plain'))
-        assert not avt.is_included(DummyResource(mime_type='message/rfc822'))
-        assert not avt.is_included(DummyResource(mime_type='image/png'))
+        assert not avt.is_included(DummyResource(filename='foo.bar', mime_type='text/plain'))
+        assert not avt.is_included(DummyResource(filename='foo.bar', mime_type='message/rfc822'))
+        assert not avt.is_included(DummyResource(filename='foo.bar', mime_type='image/png'))
     
     def test_is_infected(self, avt):
         assert not avt.is_infected(0)
