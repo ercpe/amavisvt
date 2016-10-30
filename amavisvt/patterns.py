@@ -15,9 +15,21 @@ MIN_CHUNKS = 2
 # This is a list of words often found in infected attachment names. Strings in this list
 # will become part of the [STATIC] marker in the pattern.
 STATIC_WORDS = (
-    'profile', 'invoice', 'copy', 'copies', 'unpaid', 'forward',
-    'update', 'updated', 'report', 'details', 'document', 'history',
-    'caution', 'account', 'spreadsheet'
+    'account',
+    'analysis'
+    'caution',
+    'copy', 'copies',
+    'details', 'detailed',
+    'document', 'documents'
+    'forward',
+    'history',
+    'invoice',
+    'profile',
+    'report',
+    'scan',
+    'spreadsheet',
+    'unpaid',
+    'update', 'updated',
 )
 
 def split_chunks(s, localpart=None):
