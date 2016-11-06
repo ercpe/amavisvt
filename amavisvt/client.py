@@ -444,6 +444,11 @@ class AmavisVT(object):
         if not checksums:
             return
 
+        max_hashes_per_request = 4 # Virustotal's public api limit
+        extra_hashes = max_hashes_per_request - len(checksums)
+        if extra_hashes < 0:
+            extra_hashes = 0
+
         try:
             # create a dictionary of sha256 <> filename
             query_d = dict((v, k) for k, v in checksums)
@@ -451,7 +456,7 @@ class AmavisVT(object):
             raw_checksums = [x[1] for x in checksums]
 
             # get hashes from database that have a pattern but infected=0
-            clean_hashes = self.database.get_clean_hashes(15)
+            clean_hashes = self.database.get_clean_hashes(extra_hashes)
             if clean_hashes:
                 logger.info("Piggy backing request to VT to send %s extra hashes" % len(clean_hashes))
             send_checksums = sorted(list(set(raw_checksums + clean_hashes)))
