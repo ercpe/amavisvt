@@ -31,7 +31,7 @@ Please note, the location of memcached isn't configurable at the moment. The ins
 
 As a last step, configure amavisd-new by adding the following snippet to either `@av_scanners` or `@av_scanners_backup`. Starting with 0.4 AmavisVT uses a daemon:
 
-   ['AmavisVTd',
+    ['AmavisVTd',
         \&ask_daemon, ["CONTSCAN {}\n", "/var/amavis/amavisvtd.sock"],
         undef,
         qr/(?:Detected as) (.*)/m,
