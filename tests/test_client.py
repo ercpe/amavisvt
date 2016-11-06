@@ -383,8 +383,8 @@ class TestClientRun(object):
         result = avt.run(mail)
         # the zip file in the attachment
         assert len(result) == 1
-        # the zip file in the attachment and the file inside the attachment
-        assert len(avt.clean_paths) == 2
+        # the zip file in the attachment
+        assert len(avt.clean_paths) == 1
         assert not any((os.path.exists(p) for p in avt.clean_paths))
     
     @mock.patch('amavisvt.client.requests.post')
@@ -401,8 +401,8 @@ class TestClientRun(object):
         assert requests_mock.called
         
         assert len(result) == 0
-        # the zip file in the attachment and the file inside the attachment
-        assert len(avt.clean_paths) == 2
+        # the zip file in the attachment
+        assert len(avt.clean_paths) == 1
         assert not any((os.path.exists(p) for p in avt.clean_paths))
     
     @mock.patch('amavisvt.client.requests.post')
@@ -435,8 +435,8 @@ class TestClientRun(object):
         assert not requests_mock.called
         
         assert len(result) == 1
-        # the zip file in the attachment and the file inside the attachment
-        assert len(avt.clean_paths) == 2
+        # the zip file in the attachment
+        assert len(avt.clean_paths) == 1
         assert not any((os.path.exists(p) for p in avt.clean_paths))
     
     @mock.patch('amavisvt.client.requests.post')

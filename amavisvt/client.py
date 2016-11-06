@@ -187,7 +187,7 @@ class Resource(object):
 
     @property
     def can_unpack(self):
-        return self.mime_type in ('application/zip', MAIL_MIME_TYPE,) and not self._no_unpack
+        return self.mime_type in (MAIL_MIME_TYPE,) and not self._no_unpack
 
     @property
     def filename(self):
@@ -250,9 +250,7 @@ class Resource(object):
     def unpack(self):
         unpack_func = None
 
-        if self.mime_type == 'application/zip':
-            unpack_func = self.unpack_zip
-        elif self.mime_type == MAIL_MIME_TYPE:
+        if self.mime_type == MAIL_MIME_TYPE:
             unpack_func = self.unpack_mail
 
         try:
@@ -260,37 +258,6 @@ class Resource(object):
                 yield res
         except:
             logger.exception("Error unpacking %s" % self)
-
-    def unpack_zip(self):
-        logger.debug("Unpacking %s as ZIP", self.path)
-
-        try:
-            with zipfile.ZipFile(self.path) as zf:
-                for i, zi in enumerate(zf.infolist()):
-                    if i >= 50:
-                        # it would be great to scan all the files in a zip but i haven't seen a zip file with an infected
-                        # entry which has more than a few (2-3) entries in total. If you see such files regularly, let me
-                        # know and i make this configurable.
-                        logger.warning("Stopping examining zip entry at %s", i)
-                        break
-
-                    fd, temp_path = tempfile.mkstemp('-zipentry', prefix='amavisvt-')
-                    logger.debug("Extracting entry %s to %s", zi.filename, temp_path)
-                    try:
-                        with zf.open(zi, 'r') as fi:
-                            tmp = fi.read(BUFFER_SIZE)
-                            while tmp:
-                                os.write(fd, tmp)
-                                tmp = fi.read(BUFFER_SIZE)
-
-                        yield Resource(temp_path, filename=zi.filename)
-                    except NotImplementedError as nie:
-                        logger.info("Skipping %s: %s", zi, nie)
-                    finally:
-                        os.close(fd)
-
-        except zipfile.error as e:
-            logger.error("Error unpacking zip file %s: %s", self.path, e)
 
     def unpack_mail(self):
         try:
