@@ -23,6 +23,7 @@ class TestUnpack(object):
         return os.path.join(self.samples_dir, name)
     
     def test_empty_file(self):
+        # literally, an empty mail
         path = self._resource('test1_empty.eml')
         r = Resource(path)
         assert r.path == path
@@ -33,6 +34,7 @@ class TestUnpack(object):
         assert r.mime_type == 'application/x-empty'
     
     def test_mail_file(self):
+        # a mail with an single text/plain part
         path = self._resource('test2_rfc822.eml')
         r = Resource(path)
         assert r.path == path
@@ -41,8 +43,36 @@ class TestUnpack(object):
         assert r.sha1 == "b0c42741af78f8311abeff543be8f3c62247168a"
         assert r.sha256 == "8179aa7716740f099a43d6c0aa8b77622dbbd7050bc56ce21cda2109444cf3d6"
         assert r.mime_type == 'message/rfc822'
+        
+        resources = list(r.unpack())
+        assert len(resources) == 0
     
+    def test_mail_with_single_payload(self):
+        path = self._resource('test3_rfc822_with_single_payload.eml')
+        r = Resource(path)
+        assert r.path == path
+        assert r.can_unpack
+        assert r.md5 == "6f25abac24792456c3741ef64cdd7a4d"
+        assert r.sha1 == "605f7ace5dcac01ebfb154c5b559cbd07662fad0"
+        assert r.sha256 == "c958f80e05844e7504d4ff705ffaebefa49bbfd8ce882e9a7267b9f176d8e96d"
+        assert r.mime_type == 'message/rfc822'
+    
+        resources = list(r.unpack())
+        assert len(resources) == 1
+
+        zip_attachment = resources[0]
+        assert not zip_attachment.can_unpack
+        assert zip_attachment.md5 == "e77d94e09fbcf6641c1f848d98963298"
+        assert zip_attachment.sha1 == "acbfc25a642cb7fa574f38a361932d1c2fdc1a9e"
+        assert zip_attachment.sha256 == "93440551540584e48d911586606c319744c8e671c20ee6b12cca4b922127a127"
+        assert zip_attachment.mime_type == "application/zip"
+    
+        for x in resources:
+            if not x.path == r.path:
+                os.remove(x.path)
+
     def test_unpack_mail(self):
+        # multi-part email with a zip file attachment
         path = self._resource('mail_with_attachment.eml')
         r = Resource(path)
         assert r.mime_type == "message/rfc822"
@@ -67,5 +97,6 @@ class TestUnpack(object):
                 os.remove(x.path)
     
     def test_unpack_error(self):
+        # invalid file
         uer = UnpackExceptionResource('/dev/null')
         assert not list(uer.unpack())

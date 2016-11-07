@@ -274,7 +274,23 @@ class Resource(object):
                 for part in self.unpack_mail_payload(payload):
                     yield part
             else:
-                logger.debug("Skipping single payload message")
+                # single payload message. Since it's possible that the only payload is the message itself and the
+                # payload is an attachment we need this extra block
+                ct = msg.get_content_type() if 'Content-Type' in msg else None
+                
+                if ct and not ct.startswith('text/'):  # exclude common single payloads
+                    try:
+                        res = Resource._extract_mailpart(msg.get_payload(), msg.get_filename())
+                        
+                        if res and AmavisVT.is_included(res):
+                            logger.info("Found a single, included payload in mail")
+                            yield res
+                        
+                    except:
+                        logger.exception("Could not single payload from mail")
+
+                else:
+                    logger.debug("Skipping single payload message (Content-Type: %s)", ct)
 
         except:
             logger.exception("Failed to parse mail file %s", self.path)
@@ -297,22 +313,28 @@ class Resource(object):
                 continue
 
             try:
-                partpayload = part.get_payload()
-                if len(partpayload) > 27892121:  # roughly 20 MiB as base64
-                    logger.warning("Skipping part (larger than 20MiB")
-                else:
-                    fd, temp_path = tempfile.mkstemp('-mailpart', prefix='amavisvt-')
-                    try:
-                        os.write(fd, base64.b64decode(partpayload))
-                    finally:
-                        os.close(fd)
+                res = Resource._extract_mailpart(part.get_payload(), filename)
+                if res:
+                    logger.debug("Mail part %s (%s): orig filename: %s, mime type: %s", i, res.path, filename,
+                                 res.mime_type)
+                    yield res
+            except:
+                logger.exception("Could not extract attachment %s: %s", partname)
 
-                    logger.debug("Mail part %s (%s): orig filename: %s, mime type: %s", i, temp_path, filename,
-                                 Resource(temp_path).mime_type)
+    @staticmethod
+    def _extract_mailpart(payload, filename):
+    
+        if len(payload) > 27892121:  # roughly 20 MiB as base64
+            logger.warning("Skipping part (larger than 20MiB")
+            return
 
-                    yield Resource(temp_path, filename=filename)
-            except Exception as ex:
-                logger.exception("Could not extract attachment %s: %s", partname, ex)
+        fd, temp_path = tempfile.mkstemp('-mailpart', prefix='amavisvt-')
+        try:
+            os.write(fd, base64.b64decode(payload))
+        finally:
+            os.close(fd)
+
+        return Resource(temp_path, filename=filename)
 
     def __str__(self):
         return self.filename

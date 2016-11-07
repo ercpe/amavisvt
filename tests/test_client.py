@@ -381,6 +381,7 @@ class TestClientRun(object):
                                          avt):
         mail = os.path.join(os.path.dirname(__file__), 'samples/mail_with_attachment.eml')
         result = avt.run(mail)
+        print(result)
         # the zip file in the attachment
         assert len(result) == 1
         # the zip file in the attachment
