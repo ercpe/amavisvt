@@ -317,7 +317,7 @@ class Resource(object):
                                  res.mime_type)
                     yield res
             except:
-                logger.exception("Could not extract attachment %s: %s", partname)
+                logger.exception("Could not extract attachment %s", partname)
 
     @staticmethod
     def _extract_mailpart(payload, filename):
