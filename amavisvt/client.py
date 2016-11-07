@@ -1,19 +1,17 @@
 # -*- coding: utf-8 -*-
 import base64
-import os
-import zipfile
 import email
+import hashlib
+import logging
+import os
+import re
+import shutil
+import tempfile
 from email.utils import parseaddr
 
 import magic
-import re
-import requests
-import logging
-import hashlib
 import memcache
-import tempfile
-
-import shutil
+import requests
 
 from amavisvt import VERSION
 from amavisvt.db import Database
