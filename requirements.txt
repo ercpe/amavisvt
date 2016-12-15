@@ -1,6 +1,6 @@
 # Project dependencies
 requests>=2.9.1
-filemagic
+python-magic
 python-memcached
 python-levenshtein
 setproctitle

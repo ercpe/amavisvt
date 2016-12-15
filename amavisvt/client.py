@@ -9,9 +9,9 @@ import shutil
 import tempfile
 from email.utils import parseaddr
 
-import magic
 import memcache
 import requests
+import sys
 
 from amavisvt import VERSION
 from amavisvt.db import Database
@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 BUFFER_SIZE = 4096
 
+
 def clean_silent(paths):
     for p in paths if isinstance(paths, list) else [paths]:
         try:
@@ -33,6 +34,39 @@ def clean_silent(paths):
                 os.remove(p)
         except:
             logger.exception("Could not remove %s", p)
+
+
+magic_identify_buffer = None
+
+
+def python_magic_id_buffer(buf):
+    import magic
+    t = magic.from_buffer(buf, mime=True)
+    if t and isinstance(t, bytes) and sys.version_info > (3,):
+        t = t.decode('UTF-8', 'ignore')
+    return t
+
+
+def filemagic_id_buffer(buf):
+    import magic
+    with magic.Magic(flags=magic.MAGIC_MIME_TYPE) as mgc:
+        return mgc.id_buffer(buf)
+
+
+try:
+    import magic
+
+    if hasattr(magic, 'from_buffer'):
+        # python-magic
+        identify_buffer = python_magic_id_buffer
+    elif hasattr(magic, 'MAGIC_MIME_TYPE'):
+        # filemagic
+        identify_buffer = filemagic_id_buffer
+    else:
+        raise Exception("No suitable libmagic library found. Please install either filemagic or python-magic")
+
+except ImportError:
+    raise
 
 
 class VTResponse(object):
@@ -229,21 +263,20 @@ class Resource(object):
         self._sha1 = sha1hasher.hexdigest()
         self._sha256 = sha256hasher.hexdigest()
 
-        with magic.Magic(flags=magic.MAGIC_MIME_TYPE) as m:
-            self._mime_type = m.id_buffer(id_buffer)
-            logger.debug("libmagic identified %s as: %s", self, self._mime_type)
+        self._mime_type = identify_buffer(id_buffer)
+        logger.debug("libmagic identified %s as: %s", self, self._mime_type)
 
-            # This is a hacky way to detect mail messages. Sometimes, when the amount of other text data exceeds the
-            # amount of "mail-like" data in a file (like a mail message with lots of HTML), libmagic fails to detect
-            # the file as a mail message.
-            if self._mime_type in ('text/plain', 'text/html'):
-                try:
-                    msg = email.message_from_string(id_buffer.decode('utf-8'))
-                    if len(msg.keys()) and 'From' in msg and 'To' in msg:
-                        logger.debug("Identified mail in %s when libmagic could not (said it was %s)", self.filename, self.mime_type)
-                        self._mime_type = MAIL_MIME_TYPE
-                except:
-                    pass
+        # This is a hacky way to detect mail messages. Sometimes, when the amount of other text data exceeds the
+        # amount of "mail-like" data in a file (like a mail message with lots of HTML), libmagic fails to detect
+        # the file as a mail message.
+        if self._mime_type in ('text/plain', 'text/html'):
+            try:
+                msg = email.message_from_string(id_buffer.decode('utf-8'))
+                if len(msg.keys()) and 'From' in msg and 'To' in msg:
+                    logger.debug("Identified mail in %s when libmagic could not (said it was %s)", self.filename, self.mime_type)
+                    self._mime_type = MAIL_MIME_TYPE
+            except:
+                pass
 
     def unpack(self):
         unpack_func = None
