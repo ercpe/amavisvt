@@ -28,5 +28,5 @@ clean:
 	rm -f coverage.xml testresults.xml .coverage
 	rm -fr htmlcov dist build .cache amavisvt.egg-info
 
-travis: compile compile_optimized test_default_python coverage
+travis: compile compile_optimized test coverage
 jenkins: travis sonar
