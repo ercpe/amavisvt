@@ -103,16 +103,6 @@ class TestClientBasic(object):
         assert avt.is_infected(VTResponse(RAW_DUMMY_RESPONSE))
 
 
-class TestClientDatabase(object):
-    def test_database_fallback(self):
-        c = AmavisVTConfigurationParser({
-            'database-path': '/dev/null',
-        }, path='/dev/null')
-        avt = AmavisVT(c)
-        
-        assert isinstance(avt.database, NoopDatabase)
-
-
 class TestClientCache(object):
     @mock.patch('amavisvt.client.memcache.Client.set')
     def test_cache_set(self, memcached_client_set, avt):

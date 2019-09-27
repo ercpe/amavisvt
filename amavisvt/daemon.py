@@ -26,7 +26,7 @@ class ThreadedRequestHandler(socketserver.BaseRequestHandler):
 
     def handle(self):
         temp = self.request.recv(BUFFER_SIZE)
-        data = temp
+        data = temp.decode('utf-8')
 
         if '\n' not in data:
             logger.error("Invalid data received: '%s'" % data)
@@ -68,7 +68,7 @@ class ThreadedRequestHandler(socketserver.BaseRequestHandler):
         return None, None
 
     def send_response(self, msg):
-        self.request.sendall(msg)
+        self.request.sendall(msg.encode('utf-8'))
 
     def do_ping(self):
         self.send_response('PONG')
@@ -93,7 +93,8 @@ class ThreadedRequestHandler(socketserver.BaseRequestHandler):
                     responses.append("%s: Detected as %s (%s of %s)" % (resource, ', '.join(set(matches)), scan_result.positives, scan_result.total))
                 else:
                     responses.append("%s: Clean" % resource)
-        self.request.sendall('\n'.join(responses))
+        payload = '\n'.join(responses)
+        self.request.sendall(payload.encode('utf-8'))
 
     def do_report(self, filename_argument):
         filename = os.path.abspath(filename_argument)
@@ -144,14 +145,17 @@ class AmavisVTDaemon(object):
         try:
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.connect(socket_path)
-            sock.sendall("PING")
+            sock.sendall("PING".encode('utf-8'))
             data = sock.recv(BUFFER_SIZE)
 
-            if data and data.strip() == "PONG":
+            if not data or not isinstance(data, bytes):
+                logger.info("Received garbage from socket %s: '%s'", socket_path, data)
+                return False
+            
+            data = data.decode('utf-8')
+            if data.strip() == "PONG":
                 return True
 
-            logger.info("Received garbage from socket %s: '%s'", socket_path, data)
-            return False
         except Exception as ex:
             logger.error("Socket %s isn't working: %s", socket_path, ex)
             return False

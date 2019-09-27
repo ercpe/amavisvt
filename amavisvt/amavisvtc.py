@@ -35,10 +35,11 @@ class AmavisVTClient(object):
             absolute_args = [os.path.abspath(p) for p in arguments]
             s = "%s %s" % (translate.get(command, command.upper()), ' '.join(absolute_args))
 
-            sock.sendall(s.strip() + "\n")
+            payload = s.strip() + "\n"
+            sock.sendall(payload.encode('utf-8'))
 
             data = sock.recv(BUFFER_SIZE)
-            return data
+            return data.decode('utf-8')
         finally:
             if sock:
                 sock.close()

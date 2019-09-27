@@ -27,80 +27,80 @@ class NoHandleRequestHandler(PyTestableThreadedRequestHandler):
 class TestRequestHandler(object):
     def test_handle_no_data(self):
         request_mock = mock.MagicMock()
-        request_mock.recv.return_value = ''
+        request_mock.recv.return_value = b''
         server_mock = mock.MagicMock()
         
         handler = PyTestableThreadedRequestHandler(request_mock, 'foo', server_mock)
         handler.parse_command = mock.MagicMock()
         
-        request_mock.sendall.assert_called_with("ERROR: Invalid data: ''")
+        request_mock.sendall.assert_called_with(b"ERROR: Invalid data: ''")
         assert not handler.parse_command.called
     
     def test_handle_empty_data(self):
         request_mock = mock.MagicMock()
-        request_mock.recv.return_value = '\n'
+        request_mock.recv.return_value = b'\n'
         server_mock = mock.MagicMock()
         
         handler = PyTestableThreadedRequestHandler(request_mock, 'foo', server_mock)
         handler.parse_command = mock.MagicMock()
         
-        request_mock.sendall.assert_called_with("ERROR: Unknown command 'None'")
+        request_mock.sendall.assert_called_with(b"ERROR: Unknown command 'None'")
     
     def test_handle_too_much_data(self):
         request_mock = mock.MagicMock()
         server_mock = mock.MagicMock()
         
-        data = 'x' * 10000
+        data = b'x' * 10000
         request_mock.recv.return_value = data
         
         handler = PyTestableThreadedRequestHandler(request_mock, 'foo', server_mock)
         handler.parse_command = mock.MagicMock()
         
-        request_mock.sendall.assert_called_with("ERROR: Invalid data: '%s'" % data)
+        request_mock.sendall.assert_called_with(b"ERROR: Invalid data: '%s'" % data)
         assert not handler.parse_command.called
     
     def test_ping_command(self):
         request_mock = mock.MagicMock()
         server_mock = mock.MagicMock()
         
-        request_mock.recv.return_value = 'PING\n'
+        request_mock.recv.return_value = b'PING\n'
         
         handler = PyTestableThreadedRequestHandler(request_mock, 'foo', server_mock)
-        handler.request.sendall.assert_called_with('PONG')
+        handler.request.sendall.assert_called_with(b'PONG')
     
     def test_contscan_command_no_argument(self):
         request_mock = mock.MagicMock()
         server_mock = mock.MagicMock()
         
-        request_mock.recv.return_value = 'CONTSCAN\n'
+        request_mock.recv.return_value = b'CONTSCAN\n'
         
         handler = PyTestableThreadedRequestHandler(request_mock, 'foo', server_mock)
-        handler.request.sendall.assert_called_with("ERROR: Wrong argument ''")
+        handler.request.sendall.assert_called_with(b"ERROR: Wrong argument ''")
     
     def test_contscan_command_directory_does_not_exist(self):
         request_mock = mock.MagicMock()
         server_mock = mock.MagicMock()
         
-        request_mock.recv.return_value = 'CONTSCAN /tmp/this-directory-does-not-exist\n'
+        request_mock.recv.return_value = b'CONTSCAN /tmp/this-directory-does-not-exist\n'
         
         handler = PyTestableThreadedRequestHandler(request_mock, 'foo', server_mock)
-        handler.request.sendall.assert_called_with("ERROR: Wrong argument '/tmp/this-directory-does-not-exist'")
+        handler.request.sendall.assert_called_with(b"ERROR: Wrong argument '/tmp/this-directory-does-not-exist'")
     
     def test_handle_report_command(self):
         request_mock = mock.MagicMock()
         server_mock = mock.MagicMock()
         
-        request_mock.recv.return_value = 'REPORT /tmp\n'
+        request_mock.recv.return_value = b'REPORT /tmp\n'
         
         handler = PyTestableThreadedRequestHandler(request_mock, 'foo', server_mock)
-        handler.request.sendall.assert_called_with("ERROR: File does not exist or is inaccessible: '/tmp'")
+        handler.request.sendall.assert_called_with(b"ERROR: File does not exist or is inaccessible: '/tmp'")
     
     @mock.patch('amavisvt.daemon.AmavisVT')
     def test_handle_error_in_command(self, avt):
         request_mock = mock.MagicMock()
         server_mock = mock.MagicMock()
         
-        request_mock.recv.return_value = 'REPORT %s\n' % __file__
+        request_mock.recv.return_value = f'REPORT {__file__}\n'.encode('utf-8')
         
         # return value of the mocked AmavisVT constructor
         inner_mock = mock.MagicMock()
@@ -111,7 +111,7 @@ class TestRequestHandler(object):
         inner_mock.report_to_vt = report_to_vt_mock
         
         handler = PyTestableThreadedRequestHandler(request_mock, 'foo', server_mock)
-        handler.request.sendall.assert_called_with('ERROR: Command error')
+        handler.request.sendall.assert_called_with(b'ERROR: Command error')
     
     @mock.patch('amavisvt.daemon.AmavisVT')
     def test_contscan_command(self, avt):
@@ -130,7 +130,7 @@ class TestRequestHandler(object):
         
         assert avt.called
         run_mock.assert_called_with('/')
-        request_mock.sendall.assert_called_with('AmavisVTd scan results:')
+        request_mock.sendall.assert_called_with(b'AmavisVTd scan results:')
     
     @mock.patch('amavisvt.daemon.AmavisVT')
     def test_contscan_command_response(self, avt):
@@ -162,7 +162,7 @@ class TestRequestHandler(object):
         assert request_mock.sendall.called
         call_args, call_kwargs = request_mock.sendall.call_args
         assert len(call_args) == 1
-        lines = call_args[0].split('\n')
+        lines = call_args[0].decode('utf-8').split('\n')
         assert len(lines) == 5
         assert lines[0] == "AmavisVTd scan results:"
         assert lines[1] == 'test.zip: Clean'
@@ -208,7 +208,7 @@ class TestRequestHandler(object):
         assert len(call_args) == 1
         assert isinstance(call_args[0], Resource)
         assert call_args[0].path == __file__
-        request_mock.sendall.assert_called_with('No response')
+        request_mock.sendall.assert_called_with(b'No response')
     
     @mock.patch('amavisvt.daemon.AmavisVT')
     def test_report_command_valid_argument_with_response(self, avt):
@@ -234,7 +234,7 @@ class TestRequestHandler(object):
         assert isinstance(call_args[0], Resource)
         assert call_args[0].path == __file__
         request_mock.sendall.assert_called_with(
-            '99017f6eebbac24f351415dd410d522d: Scan finished, scan information embedded in this object')
+            b'99017f6eebbac24f351415dd410d522d: Scan finished, scan information embedded in this object')
     
     def test_parse_command_invalid(self):
         handler = NoHandleRequestHandler(None, None, None)
