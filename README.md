@@ -15,7 +15,7 @@ In future versions, `amavisvt` may integrate configurable filter for the mime ty
 
 # Installation
 
-## Gentoo
+## Gentoo
 
 Add the [last hope overlay](https://ercpe.de/projects/last-hope-gentoo-portage-overlay) and emerge amavisvt:
 
