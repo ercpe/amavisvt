@@ -1,0 +1,15 @@
+[Unit]
+Description=AmavisVTd
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/lib/python3.5/dist-packages/amavisvt-0.5.3-py3.5.egg/amavisvt/amavisvtd.py
+Restart=always
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=amavisvtd
+# Run as different user?
+#User=lessprivileged
+
+[Install]
+WantedBy=multi-user.target
