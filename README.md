@@ -15,11 +15,42 @@ In future versions, `amavisvt` may integrate configurable filter for the mime ty
 
 # Installation
 
-If you are on Gentoo Linux, add the [last hope overlay](https://ercpe.de/projects/last-hope-gentoo-portage-overlay) and emerge amavisvt:
+## Gentoo
+
+Add the [last hope overlay](https://ercpe.de/projects/last-hope-gentoo-portage-overlay) and emerge amavisvt:
 
     layman -a last-hope
     emerge app-antivirus/amavisvt -av
 
+## Ubuntu 16.04 (and onward)
+
+Download and unzip the source into a directory of choice (like `/usr/local/src`). Change to the extracted files and run:
+
+```
+apt install python3-pip
+pip3 install -r requirements.txt
+python3 setup.py install
+```
+
+This should install the plugin into `/usr/local/lib/python3.5/dist-packages/amavisvt-0.5.3-py3.5.egg/amavisvt`.
+Copy `amavisvt_example.cfg` to `/etc/amavisvt.cfg` and edit it to suit your needs. Most default will be fine, but you
+**must** change the `api-key` value.
+
+To make a test run you can launch:
+
+```
+python3 /usr/local/lib/python3.5/dist-packages/amavisvt-0.5.3-py3.5.egg/amavisvt/amavisvtd.py
+```
+
+If it works you can create a systemd service by copying [`amavis-vtd.service`](etc/amavis-vtd.service) to `/etc/systemd/system` and running:
+
+```
+systemctl daemon-reload
+systemctl enable amavis-vtd
+systemctl start amavis-vtd
+```
+
+Tested with Python 3.5.2.
 
 # Configuration
 
@@ -32,7 +63,7 @@ Please note, the location of memcached isn't configurable at the moment. The ins
 As a last step, configure amavisd-new by adding the following snippet to either `@av_scanners` or `@av_scanners_backup`. Starting with 0.4 AmavisVT uses a daemon:
 
     ['AmavisVTd',
-        \&ask_daemon, ["CONTSCAN {}\n", "/var/amavis/amavisvtd.sock"],
+        \&ask_daemon, ["CONTSCAN {}\n", "/run/amavisvtd.sock"],
         undef,
         qr/(?:Detected as) (.*)/m,
         qr/(?:Detected as) (.*)/m],
